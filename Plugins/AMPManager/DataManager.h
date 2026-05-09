@@ -18,9 +18,13 @@ enum class AmpMetricId
     Balance,
     SubscriptionLeft,
     SubscriptionExpires,
+    UserConcurrency,
     AdminConcurrency,
-    TodayRevenue,
-    MonthRevenue,
+    PurchaseToday,
+    PurchaseMonth,
+    PurchaseTotal,
+    LatestRPM,
+    LatestTTFB,
     Count
 };
 
@@ -79,9 +83,14 @@ struct RuntimeData
     std::wstring admin_today_cost_usd{ L"--" };
     int admin_current_concurrency{};
     long long admin_user_count{};
+    double latest_rpm5m{};
+    double latest_ttfb_ms{};
+    bool has_latest_rpm{};
+    bool has_latest_ttfb{};
 
     long long today_revenue_cny_cent{};
     long long month_revenue_cny_cent{};
+    long long total_revenue_cny_cent{};
     long long today_sales_count{};
     long long month_sales_count{};
 };

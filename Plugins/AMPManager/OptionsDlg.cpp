@@ -62,9 +62,13 @@ BOOL COptionsDlg::OnInitDialog()
     SetCheck(this, IDC_METRIC_BALANCE_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::Balance)]);
     SetCheck(this, IDC_METRIC_SUB_LEFT_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionLeft)]);
     SetCheck(this, IDC_METRIC_SUB_EXPIRES_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionExpires)]);
+    SetCheck(this, IDC_METRIC_USER_CONCURRENCY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::UserConcurrency)]);
     SetCheck(this, IDC_METRIC_ADMIN_CONCURRENCY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminConcurrency)]);
-    SetCheck(this, IDC_METRIC_TODAY_REVENUE_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::TodayRevenue)]);
-    SetCheck(this, IDC_METRIC_MONTH_REVENUE_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::MonthRevenue)]);
+    SetCheck(this, IDC_METRIC_PURCHASE_TODAY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseToday)]);
+    SetCheck(this, IDC_METRIC_PURCHASE_MONTH_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseMonth)]);
+    SetCheck(this, IDC_METRIC_PURCHASE_TOTAL_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseTotal)]);
+    SetCheck(this, IDC_METRIC_LATEST_RPM_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::LatestRPM)]);
+    SetCheck(this, IDC_METRIC_LATEST_TTFB_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::LatestTTFB)]);
 
     return TRUE;
 }
@@ -87,9 +91,13 @@ void COptionsDlg::OnOK()
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::Balance)] = GetCheck(this, IDC_METRIC_BALANCE_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionLeft)] = GetCheck(this, IDC_METRIC_SUB_LEFT_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionExpires)] = GetCheck(this, IDC_METRIC_SUB_EXPIRES_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::UserConcurrency)] = GetCheck(this, IDC_METRIC_USER_CONCURRENCY_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminConcurrency)] = GetCheck(this, IDC_METRIC_ADMIN_CONCURRENCY_CHECK);
-    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::TodayRevenue)] = GetCheck(this, IDC_METRIC_TODAY_REVENUE_CHECK);
-    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::MonthRevenue)] = GetCheck(this, IDC_METRIC_MONTH_REVENUE_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseToday)] = GetCheck(this, IDC_METRIC_PURCHASE_TODAY_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseMonth)] = GetCheck(this, IDC_METRIC_PURCHASE_MONTH_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseTotal)] = GetCheck(this, IDC_METRIC_PURCHASE_TOTAL_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::LatestRPM)] = GetCheck(this, IDC_METRIC_LATEST_RPM_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::LatestTTFB)] = GetCheck(this, IDC_METRIC_LATEST_TTFB_CHECK);
 
     CDialog::OnOK();
 }

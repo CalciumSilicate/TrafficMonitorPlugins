@@ -79,30 +79,85 @@ namespace
         return std::to_wstring(value);
     }
 
-    std::wstring FormatCny(long long cent)
+    std::wstring FormatCompactNumber(double value, bool force_decimal = true)
     {
+        const wchar_t* suffix = L"";
+        double scaled = value;
+        double abs_value = value < 0 ? -value : value;
+        if (abs_value >= 1000000000.0)
+        {
+            scaled = value / 1000000000.0;
+            suffix = L"B";
+        }
+        else if (abs_value >= 1000000.0)
+        {
+            scaled = value / 1000000.0;
+            suffix = L"M";
+        }
+        else if (abs_value >= 1000.0)
+        {
+            scaled = value / 1000.0;
+            suffix = L"K";
+        }
+
         std::wstringstream ss;
-        ss << L"CNY " << std::fixed << std::setprecision(2) << (static_cast<double>(cent) / 100.0);
+        if (force_decimal || suffix[0] != L'\0')
+            ss << std::fixed << std::setprecision(1) << scaled << suffix;
+        else
+            ss << static_cast<long long>(scaled) << suffix;
         return ss.str();
+    }
+
+    std::wstring FormatCompactInt(long long value)
+    {
+        return FormatCompactNumber(static_cast<double>(value), false);
+    }
+
+    std::wstring FormatLimit(int value)
+    {
+        return value > 0 ? FormatInt(value) : L"inf";
+    }
+
+    std::wstring FormatCompactCny(long long cent)
+    {
+        return FormatCompactNumber(static_cast<double>(cent) / 100.0);
     }
 
     std::wstring FormatMicrosAsUsd(int64_t micros)
     {
-        std::wstringstream ss;
-        ss << L"$" << std::fixed << std::setprecision(4) << (static_cast<double>(micros) / 1000000.0);
-        return ss.str();
+        return FormatCompactNumber(static_cast<double>(micros) / 1000000.0);
     }
 
     std::wstring NormalizeUsdString(const char* value, int64_t fallback_micros)
     {
         if (value != nullptr && value[0] != '\0')
         {
-            std::wstring text = FromUtf8(value);
-            if (!text.empty() && text[0] != L'$')
-                text = L"$" + text;
-            return text;
+            return FormatCompactNumber(atof(value));
         }
         return FormatMicrosAsUsd(fallback_micros);
+    }
+
+    std::wstring FormatStatusCode(const std::wstring& status)
+    {
+        std::wstring normalized = status;
+        utilities::StringHelper::StringTransform(normalized, false);
+        if (normalized == L"operational" || normalized == L"ok" || normalized == L"success")
+            return L"OK";
+        if (normalized == L"成功" || normalized == L"正常")
+            return L"OK";
+        if (normalized == L"degraded" || normalized == L"delayed" || normalized == L"delay" || normalized == L"warning")
+            return L"DW";
+        if (normalized == L"延迟" || normalized == L"降级" || normalized == L"警告")
+            return L"DW";
+        if (normalized == L"failed" || normalized == L"failure" || normalized == L"fatal")
+            return L"FATAL";
+        if (normalized == L"失败" || normalized == L"致命")
+            return L"FATAL";
+        if (normalized == L"error" || normalized == L"err")
+            return L"ERR";
+        if (normalized == L"错误")
+            return L"ERR";
+        return L"--";
     }
 
     std::wstring ShortDateTime(yyjson_val* value)
@@ -162,6 +217,16 @@ namespace
         return value != nullptr && yyjson_is_arr(value) ? value : nullptr;
     }
 
+    yyjson_val* JsonArrayLast(yyjson_val* arr)
+    {
+        if (arr == nullptr || !yyjson_is_arr(arr))
+            return nullptr;
+        size_t size = yyjson_arr_size(arr);
+        if (size == 0)
+            return nullptr;
+        return yyjson_arr_get(arr, size - 1);
+    }
+
     std::wstring JsonWString(yyjson_val* obj, const char* key)
     {
         return utilities::JsonHelper::GetJsonWString(obj, key);
@@ -215,13 +280,17 @@ CDataManager::CDataManager()
     m_metric_definitions = {
         { AmpMetricId::Status, L"AMP status", L"AMPStatus", L"AMP", L"OK", false },
         { AmpMetricId::TodayRequests, L"AMP today requests", L"AMPTodayReq", L"Req", L"999999", false },
-        { AmpMetricId::TodayCost, L"AMP today cost", L"AMPTodayCost", L"Cost", L"$999.9999", false },
-        { AmpMetricId::Balance, L"AMP balance", L"AMPBalance", L"Bal", L"$999.9999", false },
-        { AmpMetricId::SubscriptionLeft, L"AMP subscription left", L"AMPSubLeft", L"Sub", L"$999.9999", false },
+        { AmpMetricId::TodayCost, L"AMP user today cost", L"AMPTodayCost", L"Cost", L"999.9K", false },
+        { AmpMetricId::Balance, L"AMP user balance", L"AMPBalance", L"Bal", L"999.9K", false },
+        { AmpMetricId::SubscriptionLeft, L"AMP user subscription left", L"AMPSubLeft", L"Sub", L"999.9K", false },
         { AmpMetricId::SubscriptionExpires, L"AMP subscription expires", L"AMPSubExp", L"Exp", L"2099-12-31", false },
-        { AmpMetricId::AdminConcurrency, L"AMP admin concurrency", L"AMPAdmConc", L"Conc", L"9999", true },
-        { AmpMetricId::TodayRevenue, L"AMP today revenue", L"AMPTodayRev", L"RevD", L"CNY 99999.99", true },
-        { AmpMetricId::MonthRevenue, L"AMP month revenue", L"AMPMonthRev", L"RevM", L"CNY 999999.99", true },
+        { AmpMetricId::UserConcurrency, L"AMP user concurrency", L"AMPUserConc", L"UConc", L"999/999", false },
+        { AmpMetricId::AdminConcurrency, L"AMP admin concurrency", L"AMPAdmConc", L"AConc", L"9999", true },
+        { AmpMetricId::PurchaseToday, L"AMP purchase today", L"AMPTodayRev", L"PayD", L"999.9K", true },
+        { AmpMetricId::PurchaseMonth, L"AMP purchase month", L"AMPMonthRev", L"PayM", L"999.9K", true },
+        { AmpMetricId::PurchaseTotal, L"AMP purchase total", L"AMPTotalRev", L"PayT", L"999.9M", true },
+        { AmpMetricId::LatestRPM, L"AMP latest RPM", L"AMPLatestRPM", L"RPM", L"999.9K", true },
+        { AmpMetricId::LatestTTFB, L"AMP latest TTFB", L"AMPLatestTTFB", L"TTFB", L"9999.9", true },
     };
 }
 
@@ -388,23 +457,31 @@ std::wstring CDataManager::GetMetricValue(AmpMetricId id) const
     switch (id)
     {
     case AmpMetricId::Status:
-        return data.has_status_dashboard ? data.overall_status : L"--";
+        return data.has_status_dashboard ? FormatStatusCode(data.overall_status) : L"--";
     case AmpMetricId::TodayRequests:
-        return data.has_admin_dashboard && data.is_admin ? FormatInt(data.admin_today_requests) : FormatInt(data.today_requests);
+        return FormatCompactInt(data.today_requests);
     case AmpMetricId::TodayCost:
-        return data.has_admin_dashboard && data.is_admin ? data.admin_today_cost_usd : data.today_cost_usd;
+        return data.today_cost_usd;
     case AmpMetricId::Balance:
         return data.balance_usd;
     case AmpMetricId::SubscriptionLeft:
         return data.subscription_left_usd;
     case AmpMetricId::SubscriptionExpires:
         return data.subscription_expires;
+    case AmpMetricId::UserConcurrency:
+        return FormatInt(data.user_current_concurrency) + L"/" + FormatLimit(data.user_concurrency_limit);
     case AmpMetricId::AdminConcurrency:
         return data.has_admin_dashboard ? FormatInt(data.admin_current_concurrency) : L"--";
-    case AmpMetricId::TodayRevenue:
-        return data.has_purchase_stats ? FormatCny(data.today_revenue_cny_cent) : L"--";
-    case AmpMetricId::MonthRevenue:
-        return data.has_purchase_stats ? FormatCny(data.month_revenue_cny_cent) : L"--";
+    case AmpMetricId::PurchaseToday:
+        return data.has_purchase_stats ? FormatCompactCny(data.today_revenue_cny_cent) : L"--";
+    case AmpMetricId::PurchaseMonth:
+        return data.has_purchase_stats ? FormatCompactCny(data.month_revenue_cny_cent) : L"--";
+    case AmpMetricId::PurchaseTotal:
+        return data.has_purchase_stats ? FormatCompactCny(data.total_revenue_cny_cent) : L"--";
+    case AmpMetricId::LatestRPM:
+        return data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--";
+    case AmpMetricId::LatestTTFB:
+        return data.has_latest_ttfb ? FormatCompactNumber(data.latest_ttfb_ms) : L"--";
     default:
         return L"--";
     }
@@ -420,16 +497,19 @@ std::wstring CDataManager::BuildTooltip() const
     ss << L"\nLast refresh: " << (data.last_refresh_time.empty() ? L"--" : data.last_refresh_time);
     if (!data.last_error.empty())
         ss << L"\nError: " << data.last_error;
-    ss << L"\nStatus: " << data.overall_status << L"  OK " << data.status_operational << L"/" << data.status_total;
+    ss << L"\nStatus: " << FormatStatusCode(data.overall_status) << L" (" << data.overall_status << L")  OK " << data.status_operational << L"/" << data.status_total;
     ss << L"\nToday: " << data.today_requests << L" requests, " << data.today_cost_usd;
-    ss << L"\nBalance: " << data.balance_usd << L", concurrency " << data.user_current_concurrency << L"/" << data.user_concurrency_limit;
+    ss << L"\nBalance: " << data.balance_usd << L", concurrency " << data.user_current_concurrency << L"/" << FormatLimit(data.user_concurrency_limit);
     ss << L"\nSubscription: " << data.subscription_name << L", left " << data.subscription_left_usd << L", expires " << data.subscription_expires;
     if (data.is_admin)
     {
         ss << L"\nAdmin: users " << data.admin_user_count << L", concurrency " << data.admin_current_concurrency
             << L", today cost " << data.admin_today_cost_usd;
-        ss << L"\nPurchase: today " << FormatCny(data.today_revenue_cny_cent) << L" (" << data.today_sales_count
-            << L" orders), month " << FormatCny(data.month_revenue_cny_cent) << L" (" << data.month_sales_count << L" orders)";
+        ss << L"\nThroughput: RPM " << (data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--")
+            << L", TTFB " << (data.has_latest_ttfb ? FormatCompactNumber(data.latest_ttfb_ms) : L"--") << L" ms";
+        ss << L"\nPurchase CNY: today " << FormatCompactCny(data.today_revenue_cny_cent) << L" (" << data.today_sales_count
+            << L" orders), month " << FormatCompactCny(data.month_revenue_cny_cent) << L" (" << data.month_sales_count
+            << L" orders), total " << FormatCompactCny(data.total_revenue_cny_cent);
     }
     return ss.str();
 }
@@ -529,7 +609,7 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.01", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = L"WinHttpOpen failed.";
@@ -627,7 +707,7 @@ bool CDataManager::RefreshWithCurrentToken(RuntimeData& data, std::wstring& erro
     if (data.is_admin)
     {
         std::wstring admin_error;
-        if (GetJson(L"/api/admin/dashboard?throughputWindow=24h", json, status_code, admin_error))
+        if (GetJson(L"/api/admin/dashboard?throughputWindow=1h", json, status_code, admin_error))
             ParseAdminDashboard(json, data, admin_error);
         if (GetJson(L"/api/admin/purchase/stats", json, status_code, admin_error))
             ParsePurchaseStats(json, data, admin_error);
@@ -740,10 +820,22 @@ bool CDataManager::ParseAdminDashboard(const std::string& json, RuntimeData& dat
     yyjson_val* root = yyjson_doc_get_root(doc);
     yyjson_val* balance = JsonObj(root, "balance");
     yyjson_val* today = JsonObj(root, "today");
+    yyjson_val* latest_throughput = JsonArrayLast(JsonArr(root, "throughputTrend"));
+    yyjson_val* latest_ttfb = JsonArrayLast(JsonArr(root, "ttfbTrend"));
     data.admin_current_concurrency = static_cast<int>(JsonInt(balance, "currentConcurrency"));
     data.admin_user_count = JsonInt(balance, "userCount");
     data.admin_today_requests = JsonInt(today, "requestCount");
     data.admin_today_cost_usd = NormalizeUsdString(JsonCString(today, "costUsd"), JsonInt(today, "costMicros"));
+    if (latest_throughput != nullptr)
+    {
+        data.latest_rpm5m = JsonReal(latest_throughput, "rpm5m");
+        data.has_latest_rpm = true;
+    }
+    if (latest_ttfb != nullptr)
+    {
+        data.latest_ttfb_ms = JsonReal(latest_ttfb, "avgMs");
+        data.has_latest_ttfb = true;
+    }
     data.has_admin_dashboard = true;
     yyjson_doc_free(doc);
     return true;
@@ -758,8 +850,10 @@ bool CDataManager::ParsePurchaseStats(const std::string& json, RuntimeData& data
         return false;
     }
     yyjson_val* root = yyjson_doc_get_root(doc);
+    yyjson_val* summary = JsonObj(root, "summary");
     yyjson_val* today = JsonObj(root, "today");
     yyjson_val* month = JsonObj(root, "month");
+    data.total_revenue_cny_cent = JsonInt(summary, "totalRevenueCnyCent");
     data.today_revenue_cny_cent = JsonInt(today, "revenueCnyCent");
     data.today_sales_count = JsonInt(today, "salesCount");
     data.month_revenue_cny_cent = JsonInt(month, "revenueCnyCent");
