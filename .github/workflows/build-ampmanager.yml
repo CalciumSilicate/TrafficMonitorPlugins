@@ -1,0 +1,45 @@
+name: Build AMPManager Plugin
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Plugins/AMPManager/**"
+      - "include/**"
+      - "utilities/**"
+      - "TrafficMonitorPlugins.sln"
+      - ".github/workflows/build-ampmanager.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, x86]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build AMPManager
+        shell: pwsh
+        run: |
+          msbuild TrafficMonitorPlugins.sln `
+            /m `
+            /t:AMPManager `
+            /p:Configuration=Release `
+            /p:Platform=${{ matrix.platform }}
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: AMPManager-${{ matrix.platform }}
+          path: |
+            bin/${{ matrix.platform }}/Release/AMPManager.dll
+            bin/Release/AMPManager.dll
+          if-no-files-found: error
