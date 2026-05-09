@@ -20,6 +20,10 @@ enum class AmpMetricId
     SubscriptionExpires,
     UserConcurrency,
     AdminConcurrency,
+    AdminRequests,
+    AdminBalance,
+    AdminTodayCost,
+    AdminSubscriptionUsers,
     PurchaseToday,
     PurchaseMonth,
     PurchaseTotal,
@@ -78,11 +82,14 @@ struct RuntimeData
     std::wstring subscription_name{ L"--" };
     std::wstring subscription_expires{ L"--" };
     std::wstring subscription_left_usd{ L"--" };
+    int subscription_count{};
 
     long long admin_today_requests{};
     std::wstring admin_today_cost_usd{ L"--" };
+    std::wstring admin_balance_usd{ L"--" };
     int admin_current_concurrency{};
     long long admin_user_count{};
+    long long admin_subscription_user_count{};
     double latest_rpm5m{};
     double latest_ttfb_ms{};
     bool has_latest_rpm{};
@@ -135,6 +142,7 @@ private:
     bool ParseBillingState(const std::string& json, RuntimeData& data, std::wstring& error) const;
     bool ParseStatusDashboard(const std::string& json, RuntimeData& data, std::wstring& error) const;
     bool ParseAdminDashboard(const std::string& json, RuntimeData& data, std::wstring& error) const;
+    bool ParseAdminTrends(const std::string& json, RuntimeData& data, std::wstring& error) const;
     bool ParsePurchaseStats(const std::string& json, RuntimeData& data, std::wstring& error) const;
     std::wstring ProtectPassword(const std::wstring& plain) const;
     std::wstring UnprotectPassword(const std::wstring& encoded) const;

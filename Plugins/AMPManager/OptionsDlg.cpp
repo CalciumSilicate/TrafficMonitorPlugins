@@ -64,6 +64,10 @@ BOOL COptionsDlg::OnInitDialog()
     SetCheck(this, IDC_METRIC_SUB_EXPIRES_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionExpires)]);
     SetCheck(this, IDC_METRIC_USER_CONCURRENCY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::UserConcurrency)]);
     SetCheck(this, IDC_METRIC_ADMIN_CONCURRENCY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminConcurrency)]);
+    SetCheck(this, IDC_METRIC_ADMIN_REQUESTS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminRequests)]);
+    SetCheck(this, IDC_METRIC_ADMIN_BALANCE_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminBalance)]);
+    SetCheck(this, IDC_METRIC_ADMIN_COST_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminTodayCost)]);
+    SetCheck(this, IDC_METRIC_ADMIN_SUB_USERS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminSubscriptionUsers)]);
     SetCheck(this, IDC_METRIC_PURCHASE_TODAY_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseToday)]);
     SetCheck(this, IDC_METRIC_PURCHASE_MONTH_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseMonth)]);
     SetCheck(this, IDC_METRIC_PURCHASE_TOTAL_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseTotal)]);
@@ -93,6 +97,10 @@ void COptionsDlg::OnOK()
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::SubscriptionExpires)] = GetCheck(this, IDC_METRIC_SUB_EXPIRES_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::UserConcurrency)] = GetCheck(this, IDC_METRIC_USER_CONCURRENCY_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminConcurrency)] = GetCheck(this, IDC_METRIC_ADMIN_CONCURRENCY_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminRequests)] = GetCheck(this, IDC_METRIC_ADMIN_REQUESTS_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminBalance)] = GetCheck(this, IDC_METRIC_ADMIN_BALANCE_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminTodayCost)] = GetCheck(this, IDC_METRIC_ADMIN_COST_CHECK);
+    m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::AdminSubscriptionUsers)] = GetCheck(this, IDC_METRIC_ADMIN_SUB_USERS_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseToday)] = GetCheck(this, IDC_METRIC_PURCHASE_TODAY_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseMonth)] = GetCheck(this, IDC_METRIC_PURCHASE_MONTH_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::PurchaseTotal)] = GetCheck(this, IDC_METRIC_PURCHASE_TOTAL_CHECK);

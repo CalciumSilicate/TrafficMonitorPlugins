@@ -7,6 +7,8 @@
 #include "../utilities/yyjson/yyjson.h"
 #include <algorithm>
 #include <climits>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -217,25 +219,81 @@ namespace
         return value != nullptr && yyjson_is_arr(value) ? value : nullptr;
     }
 
-    yyjson_val* JsonArrayLast(yyjson_val* arr)
+    const char* JsonCString(yyjson_val* obj, const char* key)
+    {
+        yyjson_val* value = obj == nullptr ? nullptr : yyjson_obj_get(obj, key);
+        return value != nullptr && yyjson_is_str(value) ? yyjson_get_str(value) : nullptr;
+    }
+
+    yyjson_val* JsonArrayLastWithNumber(yyjson_val* arr, const char* key, const char* positive_key = nullptr)
     {
         if (arr == nullptr || !yyjson_is_arr(arr))
             return nullptr;
         size_t size = yyjson_arr_size(arr);
-        if (size == 0)
+        while (size > 0)
+        {
+            yyjson_val* item = yyjson_arr_get(arr, --size);
+            yyjson_val* value = item == nullptr ? nullptr : yyjson_obj_get(item, key);
+            if (value == nullptr || yyjson_is_null(value))
+                continue;
+            if (positive_key != nullptr && JsonInt(item, positive_key) <= 0)
+                continue;
+            return item;
+        }
+        return nullptr;
+    }
+
+    yyjson_val* FindSubscriptionWindows(yyjson_val* subscription_windows, const char* subscription_id)
+    {
+        if (subscription_windows == nullptr || subscription_id == nullptr || !yyjson_is_arr(subscription_windows))
             return nullptr;
-        return yyjson_arr_get(arr, size - 1);
+        yyjson_val* item = nullptr;
+        yyjson_arr_iter iter;
+        yyjson_arr_iter_init(subscription_windows, &iter);
+        while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
+        {
+            const char* item_subscription_id = JsonCString(item, "subscriptionId");
+            if (item_subscription_id != nullptr && strcmp(item_subscription_id, subscription_id) == 0)
+                return JsonArr(item, "windows");
+        }
+        return nullptr;
+    }
+
+    yyjson_val* PickWindowByLimitType(yyjson_val* windows, const char* limit_type)
+    {
+        if (windows == nullptr || !yyjson_is_arr(windows))
+            return nullptr;
+        yyjson_val* item = nullptr;
+        yyjson_arr_iter iter;
+        yyjson_arr_iter_init(windows, &iter);
+        while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
+        {
+            const char* item_limit_type = JsonCString(item, "limitType");
+            if (item_limit_type != nullptr && strcmp(item_limit_type, limit_type) == 0)
+                return item;
+        }
+        return nullptr;
+    }
+
+    int64_t PickLimitMicrosByType(yyjson_val* limits, const char* limit_type)
+    {
+        if (limits == nullptr || !yyjson_is_arr(limits))
+            return -1;
+        yyjson_val* item = nullptr;
+        yyjson_arr_iter iter;
+        yyjson_arr_iter_init(limits, &iter);
+        while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
+        {
+            const char* item_limit_type = JsonCString(item, "limitType");
+            if (item_limit_type != nullptr && strcmp(item_limit_type, limit_type) == 0)
+                return JsonInt(item, "limitMicros");
+        }
+        return -1;
     }
 
     std::wstring JsonWString(yyjson_val* obj, const char* key)
     {
         return utilities::JsonHelper::GetJsonWString(obj, key);
-    }
-
-    const char* JsonCString(yyjson_val* obj, const char* key)
-    {
-        yyjson_val* value = obj == nullptr ? nullptr : yyjson_obj_get(obj, key);
-        return value != nullptr && yyjson_is_str(value) ? yyjson_get_str(value) : nullptr;
     }
 
     std::wstring BuildMetricKey(const MetricDefinition& definition)
@@ -286,10 +344,14 @@ CDataManager::CDataManager()
         { AmpMetricId::SubscriptionExpires, L"AMP subscription expires", L"AMPSubExp", L"Exp", L"2099-12-31", false },
         { AmpMetricId::UserConcurrency, L"AMP user concurrency", L"AMPUserConc", L"UConc", L"999/999", false },
         { AmpMetricId::AdminConcurrency, L"AMP admin concurrency", L"AMPAdmConc", L"AConc", L"9999", true },
-        { AmpMetricId::PurchaseToday, L"AMP purchase today", L"AMPTodayRev", L"PayD", L"999.9K", true },
-        { AmpMetricId::PurchaseMonth, L"AMP purchase month", L"AMPMonthRev", L"PayM", L"999.9K", true },
-        { AmpMetricId::PurchaseTotal, L"AMP purchase total", L"AMPTotalRev", L"PayT", L"999.9M", true },
-        { AmpMetricId::LatestRPM, L"AMP latest RPM", L"AMPLatestRPM", L"RPM", L"999.9K", true },
+        { AmpMetricId::AdminRequests, L"AMP admin today requests", L"AMPAdmReq", L"AReq", L"999.9K", true },
+        { AmpMetricId::AdminBalance, L"AMP admin total balance", L"AMPAdmBal", L"ABal", L"999.9K", true },
+        { AmpMetricId::AdminTodayCost, L"AMP admin today cost", L"AMPAdmCost", L"ACost", L"999.9K", true },
+        { AmpMetricId::AdminSubscriptionUsers, L"AMP admin subscription users", L"AMPAdmSub", L"ASub", L"9999", true },
+        { AmpMetricId::PurchaseToday, L"AMP purchase CNY today", L"AMPTodayRev", L"CNYD", L"999.9K", true },
+        { AmpMetricId::PurchaseMonth, L"AMP purchase CNY month", L"AMPMonthRev", L"CNYM", L"999.9K", true },
+        { AmpMetricId::PurchaseTotal, L"AMP purchase CNY total", L"AMPTotalRev", L"CNYT", L"999.9M", true },
+        { AmpMetricId::LatestRPM, L"AMP throughput RPM", L"AMPLatestRPM", L"TP", L"999.9K", true },
         { AmpMetricId::LatestTTFB, L"AMP latest TTFB", L"AMPLatestTTFB", L"TTFB", L"9999.9", true },
     };
 }
@@ -472,6 +534,14 @@ std::wstring CDataManager::GetMetricValue(AmpMetricId id) const
         return FormatInt(data.user_current_concurrency) + L"/" + FormatLimit(data.user_concurrency_limit);
     case AmpMetricId::AdminConcurrency:
         return data.has_admin_dashboard ? FormatInt(data.admin_current_concurrency) : L"--";
+    case AmpMetricId::AdminRequests:
+        return data.has_admin_dashboard ? FormatCompactInt(data.admin_today_requests) : L"--";
+    case AmpMetricId::AdminBalance:
+        return data.has_admin_dashboard ? data.admin_balance_usd : L"--";
+    case AmpMetricId::AdminTodayCost:
+        return data.has_admin_dashboard ? data.admin_today_cost_usd : L"--";
+    case AmpMetricId::AdminSubscriptionUsers:
+        return data.has_purchase_stats ? FormatCompactInt(data.admin_subscription_user_count) : L"--";
     case AmpMetricId::PurchaseToday:
         return data.has_purchase_stats ? FormatCompactCny(data.today_revenue_cny_cent) : L"--";
     case AmpMetricId::PurchaseMonth:
@@ -500,11 +570,12 @@ std::wstring CDataManager::BuildTooltip() const
     ss << L"\nStatus: " << FormatStatusCode(data.overall_status) << L" (" << data.overall_status << L")  OK " << data.status_operational << L"/" << data.status_total;
     ss << L"\nToday: " << data.today_requests << L" requests, " << data.today_cost_usd;
     ss << L"\nBalance: " << data.balance_usd << L", concurrency " << data.user_current_concurrency << L"/" << FormatLimit(data.user_concurrency_limit);
-    ss << L"\nSubscription: " << data.subscription_name << L", left " << data.subscription_left_usd << L", expires " << data.subscription_expires;
+    ss << L"\nSubscription: " << data.subscription_name << L", daily left " << data.subscription_left_usd << L", expires " << data.subscription_expires;
     if (data.is_admin)
     {
         ss << L"\nAdmin: users " << data.admin_user_count << L", concurrency " << data.admin_current_concurrency
-            << L", today cost " << data.admin_today_cost_usd;
+            << L", balance " << data.admin_balance_usd << L", today " << data.admin_today_requests
+            << L" requests, cost " << data.admin_today_cost_usd << L", subscription users " << data.admin_subscription_user_count;
         ss << L"\nThroughput: RPM " << (data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--")
             << L", TTFB " << (data.has_latest_ttfb ? FormatCompactNumber(data.latest_ttfb_ms) : L"--") << L" ms";
         ss << L"\nPurchase CNY: today " << FormatCompactCny(data.today_revenue_cny_cent) << L" (" << data.today_sales_count
@@ -609,7 +680,7 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.01", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.02", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = L"WinHttpOpen failed.";
@@ -709,6 +780,8 @@ bool CDataManager::RefreshWithCurrentToken(RuntimeData& data, std::wstring& erro
         std::wstring admin_error;
         if (GetJson(L"/api/admin/dashboard?throughputWindow=1h", json, status_code, admin_error))
             ParseAdminDashboard(json, data, admin_error);
+        if (GetJson(L"/api/admin/dashboard/trends?throughputWindow=1h", json, status_code, admin_error))
+            ParseAdminTrends(json, data, admin_error);
         if (GetJson(L"/api/admin/purchase/stats", json, status_code, admin_error))
             ParsePurchaseStats(json, data, admin_error);
     }
@@ -750,32 +823,104 @@ bool CDataManager::ParseBillingState(const std::string& json, RuntimeData& data,
     data.balance_usd = NormalizeUsdString(JsonCString(root, "balanceUsd"), JsonInt(root, "balanceMicros"));
 
     yyjson_val* subscription = JsonObj(root, "subscription");
-    if (subscription != nullptr)
+    yyjson_val* subscriptions = JsonArr(root, "subscriptions");
+    data.subscription_count = subscriptions == nullptr ? (subscription == nullptr ? 0 : 1) : static_cast<int>(yyjson_arr_size(subscriptions));
+    if (data.subscription_count > 1)
+    {
+        data.subscription_name = FormatInt(data.subscription_count) + L" subs";
+    }
+    else if (subscription != nullptr)
     {
         data.subscription_name = JsonWString(subscription, "planName");
         if (data.subscription_name.empty())
             data.subscription_name = L"--";
-        data.subscription_expires = ShortDateTime(yyjson_obj_get(subscription, "expiresAt"));
-        if (data.subscription_expires == L"--")
-            data.subscription_expires = L"unlimited";
     }
 
-    int64_t min_left = LLONG_MAX;
-    yyjson_val* windows = JsonArr(root, "windows");
-    if (windows != nullptr)
+    std::wstring latest_expire;
+    bool has_unlimited_expire = false;
+    if (subscriptions != nullptr)
     {
         yyjson_val* item = nullptr;
         yyjson_arr_iter iter;
-        yyjson_arr_iter_init(windows, &iter);
+        yyjson_arr_iter_init(subscriptions, &iter);
         while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
         {
-            int64_t left = JsonInt(item, "leftMicros");
-            if (left < min_left)
-                min_left = left;
+            std::wstring expire = ShortDateTime(yyjson_obj_get(item, "expiresAt"));
+            if (expire == L"--")
+            {
+                has_unlimited_expire = true;
+                continue;
+            }
+            if (!has_unlimited_expire && expire > latest_expire)
+            {
+                latest_expire = expire;
+            }
         }
     }
-    if (min_left != LLONG_MAX)
-        data.subscription_left_usd = FormatMicrosAsUsd(min_left);
+    else if (subscription != nullptr)
+    {
+        latest_expire = ShortDateTime(yyjson_obj_get(subscription, "expiresAt"));
+        if (latest_expire == L"--")
+            has_unlimited_expire = true;
+    }
+    if (has_unlimited_expire)
+        data.subscription_expires = L"unlimited";
+    else if (!latest_expire.empty())
+        data.subscription_expires = latest_expire;
+    else if (subscription == nullptr)
+        data.subscription_expires = L"--";
+
+    yyjson_val* subscription_windows = JsonArr(root, "subscriptionWindows");
+    long long total_daily_left = 0;
+    bool has_total_daily_left = false;
+    if (subscriptions != nullptr && yyjson_arr_size(subscriptions) > 0)
+    {
+        const char* current_subscription_id = JsonCString(subscription, "id");
+        yyjson_val* item = nullptr;
+        yyjson_arr_iter iter;
+        yyjson_arr_iter_init(subscriptions, &iter);
+        while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
+        {
+            const char* subscription_id = JsonCString(item, "id");
+            yyjson_val* windows = FindSubscriptionWindows(subscription_windows, subscription_id);
+            if (windows == nullptr && current_subscription_id != nullptr && subscription_id != nullptr && strcmp(subscription_id, current_subscription_id) == 0)
+                windows = JsonArr(root, "windows");
+            yyjson_val* daily = PickWindowByLimitType(windows, "daily");
+            if (daily != nullptr)
+            {
+                total_daily_left += JsonInt(daily, "leftMicros");
+                has_total_daily_left = true;
+                continue;
+            }
+            int64_t daily_limit = PickLimitMicrosByType(JsonArr(item, "limits"), "daily");
+            if (daily_limit >= 0)
+            {
+                total_daily_left += daily_limit;
+                has_total_daily_left = true;
+            }
+        }
+    }
+    else if (subscription != nullptr)
+    {
+        yyjson_val* daily = PickWindowByLimitType(JsonArr(root, "windows"), "daily");
+        if (daily != nullptr)
+        {
+            total_daily_left = JsonInt(daily, "leftMicros");
+            has_total_daily_left = true;
+        }
+        else
+        {
+            int64_t daily_limit = PickLimitMicrosByType(JsonArr(subscription, "limits"), "daily");
+            if (daily_limit >= 0)
+            {
+                total_daily_left = daily_limit;
+                has_total_daily_left = true;
+            }
+        }
+    }
+
+    if (has_total_daily_left)
+        data.subscription_left_usd = FormatMicrosAsUsd(total_daily_left);
     else if (subscription == nullptr)
         data.subscription_left_usd = L"--";
     else
@@ -820,9 +965,10 @@ bool CDataManager::ParseAdminDashboard(const std::string& json, RuntimeData& dat
     yyjson_val* root = yyjson_doc_get_root(doc);
     yyjson_val* balance = JsonObj(root, "balance");
     yyjson_val* today = JsonObj(root, "today");
-    yyjson_val* latest_throughput = JsonArrayLast(JsonArr(root, "throughputTrend"));
-    yyjson_val* latest_ttfb = JsonArrayLast(JsonArr(root, "ttfbTrend"));
+    yyjson_val* latest_throughput = JsonArrayLastWithNumber(JsonArr(root, "throughputTrend"), "rpm5m");
+    yyjson_val* latest_ttfb = JsonArrayLastWithNumber(JsonArr(root, "ttfbTrend"), "avgMs", "sampleCnt");
     data.admin_current_concurrency = static_cast<int>(JsonInt(balance, "currentConcurrency"));
+    data.admin_balance_usd = NormalizeUsdString(JsonCString(balance, "totalBalanceUsd"), JsonInt(balance, "totalBalanceMicros"));
     data.admin_user_count = JsonInt(balance, "userCount");
     data.admin_today_requests = JsonInt(today, "requestCount");
     data.admin_today_cost_usd = NormalizeUsdString(JsonCString(today, "costUsd"), JsonInt(today, "costMicros"));
@@ -841,6 +987,31 @@ bool CDataManager::ParseAdminDashboard(const std::string& json, RuntimeData& dat
     return true;
 }
 
+bool CDataManager::ParseAdminTrends(const std::string& json, RuntimeData& data, std::wstring& error) const
+{
+    yyjson_doc* doc = yyjson_read(json.c_str(), json.size(), 0);
+    if (doc == nullptr)
+    {
+        error = L"Admin trends JSON parse failed.";
+        return false;
+    }
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    yyjson_val* latest_throughput = JsonArrayLastWithNumber(JsonArr(root, "throughputTrend"), "rpm5m");
+    yyjson_val* latest_ttfb = JsonArrayLastWithNumber(JsonArr(root, "ttfbTrend"), "avgMs", "sampleCnt");
+    if (latest_throughput != nullptr)
+    {
+        data.latest_rpm5m = JsonReal(latest_throughput, "rpm5m");
+        data.has_latest_rpm = true;
+    }
+    if (latest_ttfb != nullptr)
+    {
+        data.latest_ttfb_ms = JsonReal(latest_ttfb, "avgMs");
+        data.has_latest_ttfb = true;
+    }
+    yyjson_doc_free(doc);
+    return true;
+}
+
 bool CDataManager::ParsePurchaseStats(const std::string& json, RuntimeData& data, std::wstring& error) const
 {
     yyjson_doc* doc = yyjson_read(json.c_str(), json.size(), 0);
@@ -854,6 +1025,7 @@ bool CDataManager::ParsePurchaseStats(const std::string& json, RuntimeData& data
     yyjson_val* today = JsonObj(root, "today");
     yyjson_val* month = JsonObj(root, "month");
     data.total_revenue_cny_cent = JsonInt(summary, "totalRevenueCnyCent");
+    data.admin_subscription_user_count = JsonInt(summary, "userCount");
     data.today_revenue_cny_cent = JsonInt(today, "revenueCnyCent");
     data.today_sales_count = JsonInt(today, "salesCount");
     data.month_revenue_cny_cent = JsonInt(month, "revenueCnyCent");
