@@ -277,7 +277,8 @@ void CDataManager::SaveConfig() const
     ini.WriteString(L"config", L"base_url", TrimTrailingSlash(m_setting_data.base_url));
     ini.WriteString(L"config", L"username", m_setting_data.username);
     ini.WriteString(L"config", L"password", ProtectPassword(m_setting_data.password));
-    ini.WriteInt(L"config", L"refresh_interval_sec", std::max(10, m_setting_data.refresh_interval_sec));
+    int refresh_interval = m_setting_data.refresh_interval_sec < 10 ? 10 : m_setting_data.refresh_interval_sec;
+    ini.WriteInt(L"config", L"refresh_interval_sec", refresh_interval);
     for (const auto& definition : m_metric_definitions)
     {
         const size_t index = MetricIndex(definition.id);
@@ -688,7 +689,9 @@ bool CDataManager::ParseBillingState(const std::string& json, RuntimeData& data,
         yyjson_arr_iter_init(windows, &iter);
         while ((item = yyjson_arr_iter_next(&iter)) != nullptr)
         {
-            min_left = std::min(min_left, JsonInt(item, "leftMicros"));
+            int64_t left = JsonInt(item, "leftMicros");
+            if (left < min_left)
+                min_left = left;
         }
     }
     if (min_left != LLONG_MAX)
@@ -789,7 +792,7 @@ std::wstring CDataManager::UnprotectPassword(const std::wstring& encoded) const
     if (bytes.empty())
         return L"";
     DATA_BLOB input{};
-    input.pbData = reinterpret_cast<BYTE*>(bytes.data());
+    input.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(bytes.data()));
     input.cbData = static_cast<DWORD>(bytes.size());
     DATA_BLOB output{};
     if (!CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, 0, &output))
