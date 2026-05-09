@@ -588,11 +588,7 @@ std::wstring CDataManager::BuildTooltip() const
 bool CDataManager::IsMetricVisible(AmpMetricId id) const
 {
     const size_t index = MetricIndex(id);
-    if (index >= m_setting_data.enabled_metrics.size() || !m_setting_data.enabled_metrics[index])
-        return false;
-    if (!IsAdminMetric(id))
-        return true;
-    return GetRuntimeData().is_admin;
+    return index < m_setting_data.enabled_metrics.size() && m_setting_data.enabled_metrics[index];
 }
 
 bool CDataManager::IsAdminMetric(AmpMetricId id) const
@@ -680,7 +676,7 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.02", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.03", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = L"WinHttpOpen failed.";
