@@ -1,0 +1,29 @@
+//{{NO_DEPENDENCIES}}
+// Microsoft Visual C++ generated include file.
+//
+#define IDD_OPTIONS_DIALOG              102
+#define IDS_PLUGIN_NAME                 103
+#define IDS_PLUGIN_DESCRIPTION          104
+#define IDS_REFRESH_NOW                 105
+#define IDC_BASE_URL_EDIT               1000
+#define IDC_USERNAME_EDIT               1001
+#define IDC_PASSWORD_EDIT               1002
+#define IDC_REFRESH_INTERVAL_EDIT       1003
+#define IDC_METRIC_STATUS_CHECK         1010
+#define IDC_METRIC_TODAY_REQUESTS_CHECK 1011
+#define IDC_METRIC_TODAY_COST_CHECK     1012
+#define IDC_METRIC_BALANCE_CHECK        1013
+#define IDC_METRIC_SUB_LEFT_CHECK       1014
+#define IDC_METRIC_SUB_EXPIRES_CHECK    1015
+#define IDC_METRIC_ADMIN_CONCURRENCY_CHECK 1016
+#define IDC_METRIC_TODAY_REVENUE_CHECK  1017
+#define IDC_METRIC_MONTH_REVENUE_CHECK  1018
+
+#ifdef APSTUDIO_INVOKED
+#ifndef APSTUDIO_READONLY_SYMBOLS
+#define _APS_NEXT_RESOURCE_VALUE        106
+#define _APS_NEXT_COMMAND_VALUE         40001
+#define _APS_NEXT_CONTROL_VALUE         1019
+#define _APS_NEXT_SYMED_VALUE           106
+#endif
+#endif

@@ -1,0 +1,139 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+#include "winres.h"
+#undef APSTUDIO_READONLY_SYMBOLS
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+
+#ifdef APSTUDIO_INVOKED
+1 TEXTINCLUDE
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "\r\n"
+    "\0"
+END
+#endif
+
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 220
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "AMP Manager Settings"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x0
+BEGIN
+    LTEXT           "Base URL:",IDC_STATIC,8,10,54,8
+    EDITTEXT        IDC_BASE_URL_EDIT,70,8,202,14,ES_AUTOHSCROLL
+    LTEXT           "Username:",IDC_STATIC,8,30,54,8
+    EDITTEXT        IDC_USERNAME_EDIT,70,28,202,14,ES_AUTOHSCROLL
+    LTEXT           "Password:",IDC_STATIC,8,50,54,8
+    EDITTEXT        IDC_PASSWORD_EDIT,70,48,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Refresh seconds:",IDC_STATIC,8,70,58,8
+    EDITTEXT        IDC_REFRESH_INTERVAL_EDIT,70,68,45,14,ES_NUMBER
+    GROUPBOX        "Display items",IDC_STATIC,8,90,264,96
+    CONTROL         "Status",IDC_METRIC_STATUS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,106,78,10
+    CONTROL         "Today requests",IDC_METRIC_TODAY_REQUESTS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,122,92,10
+    CONTROL         "Today cost",IDC_METRIC_TODAY_COST_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,138,78,10
+    CONTROL         "Balance",IDC_METRIC_BALANCE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,154,78,10
+    CONTROL         "Subscription left",IDC_METRIC_SUB_LEFT_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,106,96,10
+    CONTROL         "Subscription expires",IDC_METRIC_SUB_EXPIRES_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,122,108,10
+    CONTROL         "Admin concurrency",IDC_METRIC_ADMIN_CONCURRENCY_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,138,110,10
+    CONTROL         "Today revenue",IDC_METRIC_TODAY_REVENUE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,154,94,10
+    CONTROL         "Month revenue",IDC_METRIC_MONTH_REVENUE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,170,94,10
+    DEFPUSHBUTTON   "OK",IDOK,166,198,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,198,50,14
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "CalciumSilicate"
+            VALUE "FileDescription", "AMPManager Plugin for TrafficMonitor"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "AMPManager.dll"
+            VALUE "LegalCopyright", "Copyright (C) 2026 CalciumSilicate"
+            VALUE "OriginalFilename", "AMPManager.dll"
+            VALUE "ProductName", "AMPManager Plugin for TrafficMonitor"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGIN_NAME         "AMP Manager"
+    IDS_PLUGIN_DESCRIPTION  "AMP Manager status, usage, subscription, and purchase monitoring plugin for TrafficMonitor."
+    IDS_REFRESH_NOW         "Refresh AMP Manager data"
+END
+
+#endif
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 220
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "AMP Manager Settings"
+FONT 9, "Segoe UI", 400, 0, 0x0
+BEGIN
+    LTEXT           "Base URL:",IDC_STATIC,8,10,54,8
+    EDITTEXT        IDC_BASE_URL_EDIT,70,8,202,14,ES_AUTOHSCROLL
+    LTEXT           "Username:",IDC_STATIC,8,30,54,8
+    EDITTEXT        IDC_USERNAME_EDIT,70,28,202,14,ES_AUTOHSCROLL
+    LTEXT           "Password:",IDC_STATIC,8,50,54,8
+    EDITTEXT        IDC_PASSWORD_EDIT,70,48,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Refresh seconds:",IDC_STATIC,8,70,58,8
+    EDITTEXT        IDC_REFRESH_INTERVAL_EDIT,70,68,45,14,ES_NUMBER
+    GROUPBOX        "Display items",IDC_STATIC,8,90,264,96
+    CONTROL         "Status",IDC_METRIC_STATUS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,106,78,10
+    CONTROL         "Today requests",IDC_METRIC_TODAY_REQUESTS_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,122,92,10
+    CONTROL         "Today cost",IDC_METRIC_TODAY_COST_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,138,78,10
+    CONTROL         "Balance",IDC_METRIC_BALANCE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,154,78,10
+    CONTROL         "Subscription left",IDC_METRIC_SUB_LEFT_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,106,96,10
+    CONTROL         "Subscription expires",IDC_METRIC_SUB_EXPIRES_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,122,108,10
+    CONTROL         "Admin concurrency",IDC_METRIC_ADMIN_CONCURRENCY_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,138,110,10
+    CONTROL         "Today revenue",IDC_METRIC_TODAY_REVENUE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,154,94,10
+    CONTROL         "Month revenue",IDC_METRIC_MONTH_REVENUE_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,118,170,94,10
+    DEFPUSHBUTTON   "OK",IDOK,166,198,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,198,50,14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGIN_NAME         "AMP Manager"
+    IDS_PLUGIN_DESCRIPTION  "AMP Manager status, usage, subscription, and purchase monitoring plugin for TrafficMonitor."
+    IDS_REFRESH_NOW         "Refresh AMP Manager data"
+END
+
+#endif
