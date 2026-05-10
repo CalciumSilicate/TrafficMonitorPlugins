@@ -50,6 +50,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AMPManager", "Plugins\AMPMa
 		{FC324049-5EF6-4561-ABC6-D2FDD68A8768} = {FC324049-5EF6-4561-ABC6-D2FDD68A8768}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LiveWebUIViewer", "Plugins\LiveWebUIViewer\LiveWebUIViewer.vcxproj", "{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FC324049-5EF6-4561-ABC6-D2FDD68A8768} = {FC324049-5EF6-4561-ABC6-D2FDD68A8768}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64EC = Debug|ARM64EC
@@ -216,6 +221,18 @@ Global
 		{E86411B4-8C1F-4BEA-A458-F6EF4328FC0B}.Release|x64.Build.0 = Release|x64
 		{E86411B4-8C1F-4BEA-A458-F6EF4328FC0B}.Release|x86.ActiveCfg = Release|Win32
 		{E86411B4-8C1F-4BEA-A458-F6EF4328FC0B}.Release|x86.Build.0 = Release|Win32
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|ARM64EC.ActiveCfg = Debug|ARM64EC
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|ARM64EC.Build.0 = Debug|ARM64EC
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|x64.ActiveCfg = Debug|x64
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|x64.Build.0 = Debug|x64
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|x86.ActiveCfg = Debug|Win32
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Debug|x86.Build.0 = Debug|Win32
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|ARM64EC.ActiveCfg = Release|ARM64EC
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|ARM64EC.Build.0 = Release|ARM64EC
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|x64.ActiveCfg = Release|x64
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|x64.Build.0 = Release|x64
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|x86.ActiveCfg = Release|Win32
+		{A4D64E14-3B48-47D7-944B-FC4F7AB4C451}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

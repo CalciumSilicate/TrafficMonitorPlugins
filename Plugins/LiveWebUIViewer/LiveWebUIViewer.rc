@@ -1,0 +1,119 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+#include "winres.h"
+#undef APSTUDIO_READONLY_SYMBOLS
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+
+#ifdef APSTUDIO_INVOKED
+1 TEXTINCLUDE
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "\r\n"
+    "\0"
+END
+#endif
+
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 118
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "LiveWebUI Viewer Settings"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x0
+BEGIN
+    LTEXT           "Base URL:",IDC_STATIC,8,10,54,8
+    EDITTEXT        IDC_BASE_URL_EDIT,70,8,202,14,ES_AUTOHSCROLL
+    LTEXT           "Channel slug:",IDC_STATIC,8,30,54,8
+    EDITTEXT        IDC_CHANNEL_SLUG_EDIT,70,28,202,14,ES_AUTOHSCROLL
+    LTEXT           "Admin password:",IDC_STATIC,8,50,58,8
+    EDITTEXT        IDC_PASSWORD_EDIT,70,48,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Refresh seconds:",IDC_STATIC,8,70,58,8
+    EDITTEXT        IDC_REFRESH_INTERVAL_EDIT,70,68,45,14,ES_NUMBER
+    DEFPUSHBUTTON   "OK",IDOK,166,96,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,96,50,14
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "CalciumSilicate"
+            VALUE "FileDescription", "LiveWebUIViewer Plugin for TrafficMonitor"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "LiveWebUIViewer.dll"
+            VALUE "LegalCopyright", "Copyright (C) 2026 CalciumSilicate"
+            VALUE "OriginalFilename", "LiveWebUIViewer.dll"
+            VALUE "ProductName", "LiveWebUIViewer Plugin for TrafficMonitor"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGIN_NAME         "LiveWebUI Viewer"
+    IDS_PLUGIN_DESCRIPTION  "Shows a liveWebUI channel readers count in TrafficMonitor."
+    IDS_REFRESH_NOW         "Refresh LiveWebUI readers"
+END
+
+#endif
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 118
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "LiveWebUI Viewer Settings"
+FONT 9, "Segoe UI", 400, 0, 0x0
+BEGIN
+    LTEXT           "Base URL:",IDC_STATIC,8,10,54,8
+    EDITTEXT        IDC_BASE_URL_EDIT,70,8,202,14,ES_AUTOHSCROLL
+    LTEXT           "Channel slug:",IDC_STATIC,8,30,54,8
+    EDITTEXT        IDC_CHANNEL_SLUG_EDIT,70,28,202,14,ES_AUTOHSCROLL
+    LTEXT           "Admin password:",IDC_STATIC,8,50,58,8
+    EDITTEXT        IDC_PASSWORD_EDIT,70,48,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Refresh seconds:",IDC_STATIC,8,70,58,8
+    EDITTEXT        IDC_REFRESH_INTERVAL_EDIT,70,68,45,14,ES_NUMBER
+    DEFPUSHBUTTON   "OK",IDOK,166,96,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,96,50,14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGIN_NAME         "LiveWebUI Viewer"
+    IDS_PLUGIN_DESCRIPTION  "Shows a liveWebUI channel readers count in TrafficMonitor."
+    IDS_REFRESH_NOW         "Refresh LiveWebUI readers"
+END
+
+#endif

@@ -1,10 +1,11 @@
-name: Build AMPManager Plugin
+name: Build TrafficMonitor Plugins
 
 on:
   workflow_dispatch:
   push:
     paths:
       - "Plugins/AMPManager/**"
+      - "Plugins/LiveWebUIViewer/**"
       - "include/**"
       - "utilities/**"
       - "TrafficMonitorPlugins.sln"
@@ -18,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [x64, x86]
+        project: [AMPManager, LiveWebUIViewer]
 
     steps:
       - name: Checkout
@@ -26,20 +28,20 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build AMPManager
+      - name: Build plugin
         shell: pwsh
         run: |
           msbuild TrafficMonitorPlugins.sln `
             /m `
-            /t:AMPManager `
+            /t:${{ matrix.project }} `
             /p:Configuration=Release `
             /p:Platform=${{ matrix.platform }}
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
-          name: AMPManager-${{ matrix.platform }}
+          name: ${{ matrix.project }}-${{ matrix.platform }}
           path: |
-            bin/${{ matrix.platform }}/Release/AMPManager.dll
-            bin/Release/AMPManager.dll
+            bin/${{ matrix.platform }}/Release/${{ matrix.project }}.dll
+            bin/Release/${{ matrix.project }}.dll
           if-no-files-found: error
