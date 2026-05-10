@@ -14,4 +14,5 @@
     <plugin file_name="KeyboardIndicator.dll" version="1.00"/>
     <plugin file_name="LoudnessMeter.dll" version="1.00"/>
     <plugin file_name="AMPManager.dll" version="1.03"/>
+    <plugin file_name="LiveWebUIViewer.dll" version="1.00"/>
 </plugins>
