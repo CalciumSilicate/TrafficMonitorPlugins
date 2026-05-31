@@ -7,6 +7,7 @@
 #include "../utilities/yyjson/yyjson.h"
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
@@ -81,43 +82,74 @@ namespace
         return std::to_wstring(value);
     }
 
-    std::wstring FormatCompactNumber(double value, bool force_decimal = true)
+    std::wstring FormatFixed(double value, int decimals)
     {
-        const wchar_t* suffix = L"";
-        double scaled = value;
-        double abs_value = value < 0 ? -value : value;
-        if (abs_value >= 1000000000.0)
-        {
-            scaled = value / 1000000000.0;
-            suffix = L"B";
-        }
-        else if (abs_value >= 1000000.0)
-        {
-            scaled = value / 1000000.0;
-            suffix = L"M";
-        }
-        else if (abs_value >= 1000.0)
-        {
-            scaled = value / 1000.0;
-            suffix = L"K";
-        }
-
         std::wstringstream ss;
-        if (force_decimal || suffix[0] != L'\0')
-            ss << std::fixed << std::setprecision(1) << scaled << suffix;
-        else
-            ss << static_cast<long long>(scaled) << suffix;
+        ss << std::fixed << std::setprecision(decimals) << value;
         return ss.str();
+    }
+
+    int IntegerDigitCount(double value)
+    {
+        double abs_value = std::fabs(value);
+        if (!std::isfinite(abs_value) || abs_value < 1.0)
+            return 1;
+
+        int digits = 1;
+        while (abs_value >= 10.0)
+        {
+            abs_value /= 10.0;
+            ++digits;
+        }
+        return digits;
+    }
+
+    int DecimalPlacesForCompactDigits(int digits)
+    {
+        return digits >= 3 ? 1 : 2;
+    }
+
+    std::wstring FormatCompactNumber(double value)
+    {
+        static const wchar_t* suffixes[] = { L"", L"K", L"M", L"B", L"T", L"P", L"E" };
+        double abs_value = value < 0 ? -value : value;
+
+        int digits = IntegerDigitCount(abs_value);
+        if (digits <= 4)
+            return FormatFixed(value, digits >= 3 ? 1 : 2);
+
+        int suffix_index = (digits - 4) / 3 + 1;
+        suffix_index = std::min(suffix_index, static_cast<int>(_countof(suffixes)) - 1);
+
+        double scale = 1.0;
+        for (int i = 0; i < suffix_index; ++i)
+            scale *= 1000.0;
+
+        double scaled = value / scale;
+        return FormatFixed(scaled, DecimalPlacesForCompactDigits(IntegerDigitCount(scaled))) + suffixes[suffix_index];
+    }
+
+    std::wstring FormatTTFB(double milliseconds)
+    {
+        if (milliseconds >= 10000.0)
+            return FormatFixed(milliseconds / 1000.0, 1) + L"s";
+        return FormatCompactNumber(milliseconds) + L"ms";
+    }
+
+    std::wstring MakeWarningMask(const std::wstring& value)
+    {
+        size_t count = value.empty() ? 2 : value.size();
+        return std::wstring(count, L'!');
     }
 
     std::wstring FormatCompactInt(long long value)
     {
-        return FormatCompactNumber(static_cast<double>(value), false);
+        return FormatCompactNumber(static_cast<double>(value));
     }
 
     std::wstring FormatLimit(int value)
     {
-        return value > 0 ? FormatInt(value) : L"inf";
+        return value > 0 ? FormatCompactInt(value) : L"inf";
     }
 
     std::wstring FormatCompactCny(long long cent)
@@ -160,6 +192,19 @@ namespace
         if (normalized == L"错误")
             return L"ERR";
         return L"--";
+    }
+
+    bool IsWarningStatusCode(const std::wstring& status_code)
+    {
+        return status_code == L"DW" || status_code == L"ERR" || status_code == L"FATAL";
+    }
+
+    bool IsWarningBlinkFrame(const RuntimeData& data, AmpMetricId id)
+    {
+        if (id == AmpMetricId::Status || !data.has_status_dashboard || !IsWarningStatusCode(FormatStatusCode(data.overall_status)))
+            return false;
+
+        return GetTickCount64() % 1600 < 500;
     }
 
     std::wstring ShortDateTime(yyjson_val* value)
@@ -336,23 +381,23 @@ CDataManager::CDataManager()
     ::ReleaseDC(HWND_DESKTOP, hDC);
 
     m_metric_definitions = {
-        { AmpMetricId::Status, L"AMP status", L"AMPStatus", L"AMP", L"OK", false },
+        { AmpMetricId::Status, L"AMP status", L"AMPStatus", L"AMP", L"FATAL", false },
         { AmpMetricId::TodayRequests, L"AMP today requests", L"AMPTodayReq", L"Req", L"999999", false },
         { AmpMetricId::TodayCost, L"AMP user today cost", L"AMPTodayCost", L"Cost", L"999.9K", false },
         { AmpMetricId::Balance, L"AMP user balance", L"AMPBalance", L"Bal", L"999.9K", false },
         { AmpMetricId::SubscriptionLeft, L"AMP user subscription left", L"AMPSubLeft", L"Sub", L"999.9K", false },
         { AmpMetricId::SubscriptionExpires, L"AMP subscription expires", L"AMPSubExp", L"Exp", L"2099-12-31", false },
-        { AmpMetricId::UserConcurrency, L"AMP user concurrency", L"AMPUserConc", L"UConc", L"999/999", false },
-        { AmpMetricId::AdminConcurrency, L"AMP admin concurrency", L"AMPAdmConc", L"AConc", L"9999", true },
+        { AmpMetricId::UserConcurrency, L"AMP user concurrency", L"AMPUserConc", L"UConc", L"999.0/999.0", false },
+        { AmpMetricId::AdminConcurrency, L"AMP admin concurrency", L"AMPAdmConc", L"AConc", L"9999.0", true },
         { AmpMetricId::AdminRequests, L"AMP admin today requests", L"AMPAdmReq", L"AReq", L"999.9K", true },
         { AmpMetricId::AdminBalance, L"AMP admin total balance", L"AMPAdmBal", L"ABal", L"999.9K", true },
         { AmpMetricId::AdminTodayCost, L"AMP admin today cost", L"AMPAdmCost", L"ACost", L"999.9K", true },
-        { AmpMetricId::AdminSubscriptionUsers, L"AMP admin subscription users", L"AMPAdmSub", L"ASub", L"9999", true },
+        { AmpMetricId::AdminSubscriptionUsers, L"AMP admin subscription users", L"AMPAdmSub", L"ASub", L"9999.0", true },
         { AmpMetricId::PurchaseToday, L"AMP purchase CNY today", L"AMPTodayRev", L"CNYD", L"999.9K", true },
         { AmpMetricId::PurchaseMonth, L"AMP purchase CNY month", L"AMPMonthRev", L"CNYM", L"999.9K", true },
         { AmpMetricId::PurchaseTotal, L"AMP purchase CNY total", L"AMPTotalRev", L"CNYT", L"999.9M", true },
         { AmpMetricId::LatestRPM, L"AMP throughput RPM", L"AMPLatestRPM", L"TP", L"999.9K", true },
-        { AmpMetricId::LatestTTFB, L"AMP latest TTFB", L"AMPLatestTTFB", L"TTFB", L"9999.9", true },
+        { AmpMetricId::LatestTTFB, L"AMP latest TTFB", L"AMPLatestTTFB", L"TTFB", L"9999.9ms", true },
     };
 }
 
@@ -516,45 +561,65 @@ RuntimeData CDataManager::GetRuntimeData() const
 std::wstring CDataManager::GetMetricValue(AmpMetricId id) const
 {
     RuntimeData data = GetRuntimeData();
+    std::wstring value;
     switch (id)
     {
     case AmpMetricId::Status:
-        return data.has_status_dashboard ? FormatStatusCode(data.overall_status) : L"--";
+        value = data.has_status_dashboard ? FormatStatusCode(data.overall_status) : L"--";
+        break;
     case AmpMetricId::TodayRequests:
-        return FormatCompactInt(data.today_requests);
+        value = FormatCompactInt(data.today_requests);
+        break;
     case AmpMetricId::TodayCost:
-        return data.today_cost_usd;
+        value = data.today_cost_usd;
+        break;
     case AmpMetricId::Balance:
-        return data.balance_usd;
+        value = data.balance_usd;
+        break;
     case AmpMetricId::SubscriptionLeft:
-        return data.subscription_left_usd;
+        value = data.subscription_left_usd;
+        break;
     case AmpMetricId::SubscriptionExpires:
-        return data.subscription_expires;
+        value = data.subscription_expires;
+        break;
     case AmpMetricId::UserConcurrency:
-        return FormatInt(data.user_current_concurrency) + L"/" + FormatLimit(data.user_concurrency_limit);
+        value = FormatCompactInt(data.user_current_concurrency) + L"/" + FormatLimit(data.user_concurrency_limit);
+        break;
     case AmpMetricId::AdminConcurrency:
-        return data.has_admin_dashboard ? FormatInt(data.admin_current_concurrency) : L"--";
+        value = data.has_admin_dashboard ? FormatCompactInt(data.admin_current_concurrency) : L"--";
+        break;
     case AmpMetricId::AdminRequests:
-        return data.has_admin_dashboard ? FormatCompactInt(data.admin_today_requests) : L"--";
+        value = data.has_admin_dashboard ? FormatCompactInt(data.admin_today_requests) : L"--";
+        break;
     case AmpMetricId::AdminBalance:
-        return data.has_admin_dashboard ? data.admin_balance_usd : L"--";
+        value = data.has_admin_dashboard ? data.admin_balance_usd : L"--";
+        break;
     case AmpMetricId::AdminTodayCost:
-        return data.has_admin_dashboard ? data.admin_today_cost_usd : L"--";
+        value = data.has_admin_dashboard ? data.admin_today_cost_usd : L"--";
+        break;
     case AmpMetricId::AdminSubscriptionUsers:
-        return data.has_purchase_stats ? FormatCompactInt(data.admin_subscription_user_count) : L"--";
+        value = data.has_purchase_stats ? FormatCompactInt(data.admin_subscription_user_count) : L"--";
+        break;
     case AmpMetricId::PurchaseToday:
-        return data.has_purchase_stats ? FormatCompactCny(data.today_revenue_cny_cent) : L"--";
+        value = data.has_purchase_stats ? FormatCompactCny(data.today_revenue_cny_cent) : L"--";
+        break;
     case AmpMetricId::PurchaseMonth:
-        return data.has_purchase_stats ? FormatCompactCny(data.month_revenue_cny_cent) : L"--";
+        value = data.has_purchase_stats ? FormatCompactCny(data.month_revenue_cny_cent) : L"--";
+        break;
     case AmpMetricId::PurchaseTotal:
-        return data.has_purchase_stats ? FormatCompactCny(data.total_revenue_cny_cent) : L"--";
+        value = data.has_purchase_stats ? FormatCompactCny(data.total_revenue_cny_cent) : L"--";
+        break;
     case AmpMetricId::LatestRPM:
-        return data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--";
+        value = data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--";
+        break;
     case AmpMetricId::LatestTTFB:
-        return data.has_latest_ttfb ? FormatCompactNumber(data.latest_ttfb_ms) : L"--";
+        value = data.has_latest_ttfb ? FormatTTFB(data.latest_ttfb_ms) : L"--";
+        break;
     default:
-        return L"--";
+        value = L"--";
+        break;
     }
+    return IsWarningBlinkFrame(data, id) ? MakeWarningMask(value) : value;
 }
 
 std::wstring CDataManager::BuildTooltip() const
@@ -577,7 +642,7 @@ std::wstring CDataManager::BuildTooltip() const
             << L", balance " << data.admin_balance_usd << L", today " << data.admin_today_requests
             << L" requests, cost " << data.admin_today_cost_usd << L", subscription users " << data.admin_subscription_user_count;
         ss << L"\nThroughput: RPM " << (data.has_latest_rpm ? FormatCompactNumber(data.latest_rpm5m) : L"--")
-            << L", TTFB " << (data.has_latest_ttfb ? FormatCompactNumber(data.latest_ttfb_ms) : L"--") << L" ms";
+            << L", TTFB " << (data.has_latest_ttfb ? FormatTTFB(data.latest_ttfb_ms) : L"--");
         ss << L"\nPurchase CNY: today " << FormatCompactCny(data.today_revenue_cny_cent) << L" (" << data.today_sales_count
             << L" orders), month " << FormatCompactCny(data.month_revenue_cny_cent) << L" (" << data.month_sales_count
             << L" orders), total " << FormatCompactCny(data.total_revenue_cny_cent);
@@ -676,7 +741,7 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.04", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.05", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = L"WinHttpOpen failed.";
