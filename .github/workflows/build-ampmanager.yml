@@ -76,8 +76,14 @@ jobs:
         run: |
           $version = "1.04"
           New-Item -ItemType Directory -Force -Path download/AMPManager | Out-Null
-          Compress-Archive -Path artifacts/AMPManager-x64/AMPManager.dll -DestinationPath "download/AMPManager/AMPManager_V$($version)_x64.zip" -Force
-          Compress-Archive -Path artifacts/AMPManager-x86/AMPManager.dll -DestinationPath "download/AMPManager/AMPManager_V$($version)_x86.zip" -Force
+          $x64Dll = Get-ChildItem artifacts/AMPManager-x64 -Recurse -Filter AMPManager.dll | Select-Object -First 1
+          $x86Dll = Get-ChildItem artifacts/AMPManager-x86 -Recurse -Filter AMPManager.dll | Select-Object -First 1
+          if ($null -eq $x64Dll -or $null -eq $x86Dll) {
+            Get-ChildItem artifacts -Recurse | Select-Object FullName
+            throw "AMPManager.dll artifact was not found."
+          }
+          Compress-Archive -Path $x64Dll.FullName -DestinationPath "download/AMPManager/AMPManager_V$($version)_x64.zip" -Force
+          Compress-Archive -Path $x86Dll.FullName -DestinationPath "download/AMPManager/AMPManager_V$($version)_x86.zip" -Force
 
       - name: Commit AMPManager download zips
         shell: pwsh
