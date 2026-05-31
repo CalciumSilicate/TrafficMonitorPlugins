@@ -961,16 +961,16 @@ bool CDataManager::ParseAdminDashboard(const std::string& json, RuntimeData& dat
     yyjson_val* root = yyjson_doc_get_root(doc);
     yyjson_val* balance = JsonObj(root, "balance");
     yyjson_val* today = JsonObj(root, "today");
-    yyjson_val* latest_throughput = JsonArrayLastWithNumber(JsonArr(root, "throughputTrend"), "rpm5m");
     yyjson_val* latest_ttfb = JsonArrayLastWithNumber(JsonArr(root, "ttfbTrend"), "avgMs", "sampleCnt");
     data.admin_current_concurrency = static_cast<int>(JsonInt(balance, "currentConcurrency"));
     data.admin_balance_usd = NormalizeUsdString(JsonCString(balance, "totalBalanceUsd"), JsonInt(balance, "totalBalanceMicros"));
     data.admin_user_count = JsonInt(balance, "userCount");
     data.admin_today_requests = JsonInt(today, "requestCount");
     data.admin_today_cost_usd = NormalizeUsdString(JsonCString(today, "costUsd"), JsonInt(today, "costMicros"));
-    if (latest_throughput != nullptr)
+    yyjson_val* current_rpm = balance == nullptr ? nullptr : yyjson_obj_get(balance, "currentRpm");
+    if (current_rpm != nullptr && !yyjson_is_null(current_rpm))
     {
-        data.latest_rpm5m = JsonReal(latest_throughput, "rpm5m");
+        data.latest_rpm5m = JsonReal(balance, "currentRpm");
         data.has_latest_rpm = true;
     }
     if (latest_ttfb != nullptr)
@@ -992,13 +992,7 @@ bool CDataManager::ParseAdminTrends(const std::string& json, RuntimeData& data, 
         return false;
     }
     yyjson_val* root = yyjson_doc_get_root(doc);
-    yyjson_val* latest_throughput = JsonArrayLastWithNumber(JsonArr(root, "throughputTrend"), "rpm5m");
     yyjson_val* latest_ttfb = JsonArrayLastWithNumber(JsonArr(root, "ttfbTrend"), "avgMs", "sampleCnt");
-    if (latest_throughput != nullptr)
-    {
-        data.latest_rpm5m = JsonReal(latest_throughput, "rpm5m");
-        data.has_latest_rpm = true;
-    }
     if (latest_ttfb != nullptr)
     {
         data.latest_ttfb_ms = JsonReal(latest_ttfb, "avgMs");
