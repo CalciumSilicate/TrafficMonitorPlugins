@@ -11,6 +11,9 @@ on:
       - "TrafficMonitorPlugins.sln"
       - ".github/workflows/build-ampmanager.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -45,3 +48,46 @@ jobs:
             bin/${{ matrix.platform }}/Release/${{ matrix.project }}.dll
             bin/Release/${{ matrix.project }}.dll
           if-no-files-found: error
+
+  package-ampmanager-download:
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download AMPManager x64
+        uses: actions/download-artifact@v4
+        with:
+          name: AMPManager-x64
+          path: artifacts/AMPManager-x64
+
+      - name: Download AMPManager x86
+        uses: actions/download-artifact@v4
+        with:
+          name: AMPManager-x86
+          path: artifacts/AMPManager-x86
+
+      - name: Package AMPManager download zips
+        shell: pwsh
+        run: |
+          $version = "1.04"
+          New-Item -ItemType Directory -Force -Path download/AMPManager | Out-Null
+          Compress-Archive -Path artifacts/AMPManager-x64/AMPManager.dll -DestinationPath "download/AMPManager/AMPManager_V$($version)_x64.zip" -Force
+          Compress-Archive -Path artifacts/AMPManager-x86/AMPManager.dll -DestinationPath "download/AMPManager/AMPManager_V$($version)_x86.zip" -Force
+
+      - name: Commit AMPManager download zips
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add download/AMPManager/AMPManager_V1.04_x64.zip download/AMPManager/AMPManager_V1.04_x86.zip
+          if ((git status --porcelain).Length -eq 0) {
+            Write-Host "No AMPManager download zip changes to commit."
+            exit 0
+          }
+          git commit -m "chore: 添加 AMP Manager 1.04 插件下载包"
+          git push origin HEAD:${{ github.ref_name }}

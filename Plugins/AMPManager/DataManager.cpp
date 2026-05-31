@@ -676,7 +676,7 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.03", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.04", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = L"WinHttpOpen failed.";
