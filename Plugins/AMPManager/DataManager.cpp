@@ -119,7 +119,9 @@ namespace
             return FormatFixed(value, digits >= 3 ? 1 : 2);
 
         int suffix_index = (digits - 4) / 3 + 1;
-        suffix_index = std::min(suffix_index, static_cast<int>(_countof(suffixes)) - 1);
+        int max_suffix_index = static_cast<int>(_countof(suffixes)) - 1;
+        if (suffix_index > max_suffix_index)
+            suffix_index = max_suffix_index;
 
         double scale = 1.0;
         for (int i = 0; i < suffix_index; ++i)
