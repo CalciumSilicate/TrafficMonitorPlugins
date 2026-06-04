@@ -196,17 +196,17 @@ namespace
         return L"--";
     }
 
-    bool IsWarningStatusCode(const std::wstring& status_code)
+    bool IsErrorStatusCode(const std::wstring& status_code)
     {
-        return status_code == L"DW" || status_code == L"ERR" || status_code == L"FATAL";
+        return status_code == L"ERR" || status_code == L"FATAL";
     }
 
-    bool IsWarningBlinkFrame(const RuntimeData& data, AmpMetricId id)
+    bool IsErrorBlinkFrame(const RuntimeData& data, AmpMetricId id)
     {
-        if (id == AmpMetricId::Status || !data.has_status_dashboard || !IsWarningStatusCode(FormatStatusCode(data.overall_status)))
+        if (id == AmpMetricId::Status || !data.has_status_dashboard || !IsErrorStatusCode(FormatStatusCode(data.overall_status)))
             return false;
 
-        return GetTickCount64() % 1600 < 500;
+        return GetTickCount64() % 800 < 250;
     }
 
     std::wstring ShortDateTime(yyjson_val* value)
@@ -621,7 +621,7 @@ std::wstring CDataManager::GetMetricValue(AmpMetricId id) const
         value = L"--";
         break;
     }
-    return IsWarningBlinkFrame(data, id) ? MakeWarningMask(value) : value;
+    return IsErrorBlinkFrame(data, id) ? MakeWarningMask(value) : value;
 }
 
 std::wstring CDataManager::BuildTooltip() const
