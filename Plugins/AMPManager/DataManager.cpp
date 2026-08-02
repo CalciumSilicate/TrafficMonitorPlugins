@@ -196,6 +196,77 @@ namespace
         return L"--";
     }
 
+    int StatusSeverity(const std::wstring& status)
+    {
+        std::wstring normalized = status;
+        utilities::StringHelper::StringTransform(normalized, false);
+        if (normalized == L"failed" || normalized == L"failure" || normalized == L"fatal" || normalized == L"失败" || normalized == L"致命")
+            return 5;
+        if (normalized == L"error" || normalized == L"err" || normalized == L"错误")
+            return 4;
+        if (normalized == L"degraded" || normalized == L"delayed" || normalized == L"delay" || normalized == L"warning"
+            || normalized == L"延迟" || normalized == L"降级" || normalized == L"警告")
+            return 3;
+        if (normalized == L"operational" || normalized == L"ok" || normalized == L"success"
+            || normalized == L"成功" || normalized == L"正常")
+            return 2;
+        return 1;
+    }
+
+    std::wstring WorseStatus(const std::wstring& left, const std::wstring& right)
+    {
+        return StatusSeverity(left) >= StatusSeverity(right) ? left : right;
+    }
+
+    std::vector<std::wstring> ParseBlockWords(const std::wstring& raw)
+    {
+        std::vector<std::wstring> words;
+        utilities::StringHelper::StringSplit(raw, L',', words, true, true);
+        for (auto& word : words)
+            utilities::StringHelper::StringTransform(word, false);
+        words.erase(std::remove_if(words.begin(), words.end(), [](const std::wstring& word) {
+            return word.empty();
+        }), words.end());
+        return words;
+    }
+
+    bool ContainsIgnoreCase(std::wstring haystack, const std::wstring& needle)
+    {
+        if (needle.empty())
+            return false;
+        utilities::StringHelper::StringTransform(haystack, false);
+        return haystack.find(needle) != std::wstring::npos;
+    }
+
+    bool IsBlockedByWords(const std::wstring& name, const std::wstring& channel_name, const std::wstring& model, const std::vector<std::wstring>& block_words)
+    {
+        if (block_words.empty())
+            return false;
+
+        for (const auto& word : block_words)
+        {
+            if (ContainsIgnoreCase(name, word)
+                || ContainsIgnoreCase(channel_name, word)
+                || ContainsIgnoreCase(model, word))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void CountStatusBucket(const std::wstring& status, int& operational, int& degraded, int& error, int& failed, int& unknown)
+    {
+        switch (StatusSeverity(status))
+        {
+        case 5: ++failed; break;
+        case 4: ++error; break;
+        case 3: ++degraded; break;
+        case 2: ++operational; break;
+        default: ++unknown; break;
+        }
+    }
+
     bool IsErrorStatusCode(const std::wstring& status_code)
     {
         return status_code == L"ERR" || status_code == L"FATAL";
@@ -436,6 +507,7 @@ void CDataManager::LoadConfig(const std::wstring& config_dir)
     m_setting_data.username = ini.GetString(L"config", L"username", L"");
     m_setting_data.password = UnprotectPassword(ini.GetString(L"config", L"password", L""));
     m_setting_data.refresh_interval_sec = ini.GetInt(L"config", L"refresh_interval_sec", 30);
+    m_setting_data.block_words = ini.GetString(L"config", L"block_words", L"");
     if (m_setting_data.refresh_interval_sec < 10)
         m_setting_data.refresh_interval_sec = 10;
 
@@ -457,6 +529,7 @@ void CDataManager::SaveConfig() const
     ini.WriteString(L"config", L"password", ProtectPassword(m_setting_data.password));
     int refresh_interval = m_setting_data.refresh_interval_sec < 10 ? 10 : m_setting_data.refresh_interval_sec;
     ini.WriteInt(L"config", L"refresh_interval_sec", refresh_interval);
+    ini.WriteString(L"config", L"block_words", m_setting_data.block_words);
     for (const auto& definition : m_metric_definitions)
     {
         const size_t index = MetricIndex(definition.id);
@@ -635,6 +708,8 @@ std::wstring CDataManager::BuildTooltip() const
     if (!data.last_error.empty())
         ss << L"\nError: " << data.last_error;
     ss << L"\nStatus: " << FormatStatusCode(data.overall_status) << L" (" << data.overall_status << L")  OK " << data.status_operational << L"/" << data.status_total;
+    if (data.status_blocked > 0)
+        ss << L", blocked " << data.status_blocked;
     ss << L"\nToday: " << data.today_requests << L" requests, " << data.today_cost_usd;
     ss << L"\nBalance: " << data.balance_usd << L", concurrency " << data.user_current_concurrency << L"/" << FormatLimit(data.user_concurrency_limit);
     ss << L"\nSubscription: " << data.subscription_name << L", daily left " << data.subscription_left_usd << L", expires " << data.subscription_expires;
@@ -1002,16 +1077,85 @@ bool CDataManager::ParseStatusDashboard(const std::string& json, RuntimeData& da
         error = L"Status dashboard JSON parse failed.";
         return false;
     }
+
     yyjson_val* root = yyjson_doc_get_root(doc);
-    data.overall_status = JsonWString(root, "overallStatus");
-    if (data.overall_status.empty())
-        data.overall_status = L"--";
-    yyjson_val* counts = JsonObj(root, "summaryCounts");
-    data.status_total = static_cast<int>(JsonInt(counts, "total"));
-    data.status_operational = static_cast<int>(JsonInt(counts, "operational"));
-    data.status_degraded = static_cast<int>(JsonInt(counts, "degraded"));
-    data.status_error = static_cast<int>(JsonInt(counts, "error"));
-    data.status_failed = static_cast<int>(JsonInt(counts, "failed"));
+    const std::vector<std::wstring> block_words = ParseBlockWords(m_setting_data.block_words);
+
+    // Prefer local recompute from groups/items so block words can veto noisy channels.
+    // Fall back to server overallStatus/summaryCounts when groups are absent.
+    yyjson_val* groups = JsonArr(root, "groups");
+    bool recomputed = false;
+    if (groups != nullptr)
+    {
+        int total = 0;
+        int operational = 0;
+        int degraded = 0;
+        int error_count = 0;
+        int failed = 0;
+        int unknown = 0;
+        int blocked = 0;
+        std::wstring overall = L"unknown";
+        bool has_items = false;
+
+        yyjson_val* group = nullptr;
+        yyjson_arr_iter group_iter;
+        yyjson_arr_iter_init(groups, &group_iter);
+        while ((group = yyjson_arr_iter_next(&group_iter)) != nullptr)
+        {
+            yyjson_val* items = JsonArr(group, "items");
+            if (items == nullptr)
+                continue;
+
+            yyjson_val* item = nullptr;
+            yyjson_arr_iter item_iter;
+            yyjson_arr_iter_init(items, &item_iter);
+            while ((item = yyjson_arr_iter_next(&item_iter)) != nullptr)
+            {
+                const std::wstring name = JsonWString(item, "name");
+                const std::wstring channel_name = JsonWString(item, "channelName");
+                const std::wstring model = JsonWString(item, "model");
+                yyjson_val* latest = JsonObj(item, "latest");
+                std::wstring status = latest != nullptr ? JsonWString(latest, "status") : L"unknown";
+                if (status.empty())
+                    status = L"unknown";
+
+                if (IsBlockedByWords(name, channel_name, model, block_words))
+                {
+                    ++blocked;
+                    continue;
+                }
+
+                has_items = true;
+                ++total;
+                CountStatusBucket(status, operational, degraded, error_count, failed, unknown);
+                overall = WorseStatus(overall, status);
+            }
+        }
+
+        data.overall_status = has_items ? overall : L"--";
+        data.status_total = total;
+        data.status_operational = operational;
+        data.status_degraded = degraded;
+        data.status_error = error_count;
+        data.status_failed = failed;
+        data.status_blocked = blocked;
+        recomputed = true;
+    }
+
+    if (!recomputed)
+    {
+        data.overall_status = JsonWString(root, "overallStatus");
+        if (data.overall_status.empty())
+            data.overall_status = L"--";
+        yyjson_val* counts = JsonObj(root, "summaryCounts");
+        data.status_total = static_cast<int>(JsonInt(counts, "total"));
+        data.status_operational = static_cast<int>(JsonInt(counts, "operational"));
+        data.status_degraded = static_cast<int>(JsonInt(counts, "degraded"));
+        data.status_error = static_cast<int>(JsonInt(counts, "error"));
+        data.status_failed = static_cast<int>(JsonInt(counts, "failed"));
+        data.status_blocked = 0;
+    }
+
     data.has_status_dashboard = true;
     yyjson_doc_free(doc);
     return true;

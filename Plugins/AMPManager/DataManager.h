@@ -48,6 +48,7 @@ struct SettingData
     std::wstring username;
     std::wstring password;
     int refresh_interval_sec{ 30 };
+    std::wstring block_words;
     std::array<bool, static_cast<size_t>(AmpMetricId::Count)> enabled_metrics{};
 
     SettingData();
@@ -72,6 +73,7 @@ struct RuntimeData
     int status_degraded{};
     int status_error{};
     int status_failed{};
+    int status_blocked{};
 
     long long today_requests{};
     std::wstring today_cost_usd{ L"--" };

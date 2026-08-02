@@ -9,6 +9,7 @@
 #define IDC_USERNAME_EDIT               1001
 #define IDC_PASSWORD_EDIT               1002
 #define IDC_REFRESH_INTERVAL_EDIT       1003
+#define IDC_BLOCK_WORDS_EDIT            1004
 #define IDC_METRIC_STATUS_CHECK         1010
 #define IDC_METRIC_TODAY_REQUESTS_CHECK 1011
 #define IDC_METRIC_TODAY_COST_CHECK     1012
@@ -31,7 +32,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        106
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1027
+#define _APS_NEXT_CONTROL_VALUE         1028
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

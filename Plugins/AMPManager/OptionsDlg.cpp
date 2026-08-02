@@ -55,6 +55,7 @@ BOOL COptionsDlg::OnInitDialog()
     SetDlgText(this, IDC_USERNAME_EDIT, m_data.username);
     SetDlgText(this, IDC_PASSWORD_EDIT, m_data.password);
     SetDlgItemInt(IDC_REFRESH_INTERVAL_EDIT, m_data.refresh_interval_sec);
+    SetDlgText(this, IDC_BLOCK_WORDS_EDIT, m_data.block_words);
 
     SetCheck(this, IDC_METRIC_STATUS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::Status)]);
     SetCheck(this, IDC_METRIC_TODAY_REQUESTS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::TodayRequests)]);
@@ -86,6 +87,7 @@ void COptionsDlg::OnOK()
     BOOL translated = FALSE;
     UINT interval = GetDlgItemInt(IDC_REFRESH_INTERVAL_EDIT, &translated, FALSE);
     m_data.refresh_interval_sec = translated ? static_cast<int>(interval) : 30;
+    m_data.block_words = GetDlgText(this, IDC_BLOCK_WORDS_EDIT);
     if (m_data.refresh_interval_sec < 10)
         m_data.refresh_interval_sec = 10;
 
