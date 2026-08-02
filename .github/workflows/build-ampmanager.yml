@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     strategy:
       fail-fast: false
@@ -30,6 +30,25 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+
+      - name: Install MFC libraries
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          if ([string]::IsNullOrWhiteSpace($installPath)) {
+            throw "Visual Studio installation path was not found."
+          }
+
+          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          Write-Host "Installing MFC into $installPath"
+          & $setup modify `
+            --installPath $installPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --norestart --force
+          if ($LASTEXITCODE -notin 0, 3010) {
+            throw "Failed to install MFC components. Exit code: $LASTEXITCODE"
+          }
 
       - name: Build plugin
         shell: pwsh
@@ -51,7 +70,7 @@ jobs:
 
   package-ampmanager-download:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
