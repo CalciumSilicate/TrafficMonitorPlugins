@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <array>
+#include <condition_variable>
 #include <ctime>
 #include <map>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 #include "resource.h"
 
@@ -58,7 +61,7 @@ struct SettingData
     SettingData();
 };
 
-struct StatusIssueData
+struct StatusChannelData
 {
     std::wstring status;
     std::wstring channel_name;
@@ -87,7 +90,8 @@ struct RuntimeData
     int status_error{};
     int status_failed{};
     int status_blocked{};
-    std::vector<StatusIssueData> status_issues;
+    std::vector<StatusChannelData> status_channels;
+    std::vector<StatusChannelData> status_issues;
 
     long long today_requests{};
     std::wstring today_cost_usd{ L"--" };
@@ -139,6 +143,7 @@ public:
     void Refresh();
     void ClearToken();
     void ResetOneBotNotification();
+    void RestartOneBotCommandListener();
     RuntimeData GetRuntimeData() const;
     std::wstring GetMetricValue(AmpMetricId id) const;
     std::wstring BuildTooltip() const;
@@ -163,6 +168,11 @@ private:
     bool ParsePurchaseStats(const std::string& json, RuntimeData& data, std::wstring& error) const;
     void NotifyOneBotIfNeeded(RuntimeData& data);
     bool SendOneBotPrivateMessage(const std::wstring& message, std::wstring& error) const;
+    void StopOneBotCommandListener();
+    void OneBotCommandListenerLoop(std::wstring event_url, std::wstring token, std::wstring private_target);
+    std::wstring BuildOneBotStatusMessage() const;
+    void SetOneBotCommandError(const std::wstring& error);
+    std::wstring GetOneBotCommandError() const;
     std::wstring ProtectPassword(const std::wstring& plain) const;
     std::wstring UnprotectPassword(const std::wstring& encoded) const;
     void SetRuntimeData(const RuntimeData& data);
@@ -174,11 +184,19 @@ private:
     std::map<UINT, HICON> m_icons;
     int m_dpi{ 96 };
 
+    std::mutex m_refresh_mutex;
     mutable std::mutex m_runtime_mutex;
     RuntimeData m_runtime_data;
     std::wstring m_token;
     time_t m_last_refresh_time{};
     std::wstring m_last_notification_key;
+
+    mutable std::mutex m_onebot_listener_mutex;
+    std::condition_variable m_onebot_listener_cv;
+    std::thread m_onebot_listener_thread;
+    std::atomic_bool m_onebot_listener_stop{ true };
+    void* m_onebot_listener_websocket{};
+    std::wstring m_onebot_command_error;
 
     std::vector<MetricDefinition> m_metric_definitions;
 };

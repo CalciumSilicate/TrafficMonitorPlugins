@@ -6,10 +6,12 @@
 #include "../utilities/bass64/base64.h"
 #include "../utilities/yyjson/yyjson.h"
 #include <algorithm>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <cwctype>
 #include <iomanip>
 #include <sstream>
 #include <thread>
@@ -33,6 +35,17 @@ namespace
         while (!value.empty() && (value.back() == L'/' || value.back() == L'\\'))
             value.pop_back();
         return value;
+    }
+
+    std::wstring TrimWhitespace(const std::wstring& value)
+    {
+        size_t begin = 0;
+        while (begin < value.size() && std::iswspace(value[begin]))
+            ++begin;
+        size_t end = value.size();
+        while (end > begin && std::iswspace(value[end - 1]))
+            --end;
+        return value.substr(begin, end - begin);
     }
 
     bool StartsWithIgnoreCase(const std::wstring& value, const wchar_t* prefix)
@@ -355,13 +368,59 @@ namespace
         return value != nullptr && yyjson_is_str(value) ? yyjson_get_str(value) : nullptr;
     }
 
-    bool IsOneBotAlertResponse(const std::string& json)
+    bool IsOneBotResponse(const std::string& json, const char* expected_echo)
     {
         yyjson_doc* doc = yyjson_read(json.c_str(), json.size(), 0);
         if (doc == nullptr)
             return false;
         const char* echo = JsonCString(yyjson_doc_get_root(doc), "echo");
-        const bool matches = echo != nullptr && strcmp(echo, "amp-manager-alert") == 0;
+        const bool matches = echo != nullptr && strcmp(echo, expected_echo) == 0;
+        yyjson_doc_free(doc);
+        return matches;
+    }
+
+    bool IsOneBotStatusCommand(const std::string& json, const std::wstring& private_target)
+    {
+        yyjson_doc* doc = yyjson_read(json.c_str(), json.size(), 0);
+        if (doc == nullptr)
+            return false;
+
+        yyjson_val* root = yyjson_doc_get_root(doc);
+        const char* post_type = JsonCString(root, "post_type");
+        const char* message_type = JsonCString(root, "message_type");
+        const std::wstring sender = std::to_wstring(JsonInt(root, "user_id"));
+        bool matches = post_type != nullptr && strcmp(post_type, "message") == 0
+            && message_type != nullptr && strcmp(message_type, "private") == 0
+            && sender == TrimWhitespace(private_target);
+
+        std::wstring message;
+        if (matches)
+        {
+            const char* raw_message = JsonCString(root, "raw_message");
+            if (raw_message != nullptr)
+                message = FromUtf8(raw_message);
+            yyjson_val* message_value = yyjson_obj_get(root, "message");
+            if (message.empty() && message_value != nullptr && yyjson_is_str(message_value))
+                message = FromUtf8(yyjson_get_str(message_value));
+            if (message.empty() && message_value != nullptr && yyjson_is_arr(message_value))
+            {
+                yyjson_val* segment = nullptr;
+                yyjson_arr_iter iter;
+                yyjson_arr_iter_init(message_value, &iter);
+                while ((segment = yyjson_arr_iter_next(&iter)) != nullptr)
+                {
+                    const char* type = JsonCString(segment, "type");
+                    if (type != nullptr && strcmp(type, "text") == 0)
+                    {
+                        const char* text = JsonCString(JsonObj(segment, "data"), "text");
+                        if (text != nullptr)
+                            message += FromUtf8(text);
+                    }
+                }
+            }
+            matches = TrimWhitespace(message) == L"\u72b6\u6001";
+        }
+
         yyjson_doc_free(doc);
         return matches;
     }
@@ -461,6 +520,132 @@ namespace
         }
         operator HINTERNET() const { return value; }
     };
+
+    std::wstring OneBotEventUrl(const std::wstring& configured_url)
+    {
+        const size_t suffix_pos = configured_url.find_first_of(L"?#");
+        const size_t path_end = suffix_pos == std::wstring::npos ? configured_url.size() : suffix_pos;
+        size_t normalized_end = path_end;
+        while (normalized_end > 0 && configured_url[normalized_end - 1] == L'/')
+            --normalized_end;
+        constexpr wchar_t api_suffix[] = L"/api";
+        constexpr size_t api_suffix_length = _countof(api_suffix) - 1;
+        if (normalized_end >= api_suffix_length
+            && _wcsnicmp(configured_url.c_str() + normalized_end - api_suffix_length, api_suffix, api_suffix_length) == 0)
+        {
+            return configured_url.substr(0, normalized_end - api_suffix_length)
+                + L"/event" + configured_url.substr(path_end);
+        }
+        return configured_url;
+    }
+
+    bool OpenOneBotWebSocket(
+        const std::wstring& configured_url,
+        const std::wstring& token,
+        WinHttpHandle& session,
+        WinHttpHandle& connect,
+        WinHttpHandle& websocket,
+        std::wstring& error)
+    {
+        std::wstring url = configured_url;
+        if (StartsWithIgnoreCase(url, L"wss://"))
+            url.replace(0, 6, L"https://");
+        else if (StartsWithIgnoreCase(url, L"ws://"))
+            url.replace(0, 5, L"http://");
+        else
+        {
+            error = L"OneBot URL must start with ws:// or wss://.";
+            return false;
+        }
+
+        URL_COMPONENTS parts{};
+        parts.dwStructSize = sizeof(parts);
+        parts.dwSchemeLength = static_cast<DWORD>(-1);
+        parts.dwHostNameLength = static_cast<DWORD>(-1);
+        parts.dwUrlPathLength = static_cast<DWORD>(-1);
+        parts.dwExtraInfoLength = static_cast<DWORD>(-1);
+        if (!WinHttpCrackUrl(url.c_str(), static_cast<DWORD>(url.size()), 0, &parts))
+        {
+            error = L"Invalid OneBot WS URL.";
+            return false;
+        }
+
+        std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
+        std::wstring object_name;
+        if (parts.lpszUrlPath != nullptr && parts.dwUrlPathLength > 0)
+            object_name.assign(parts.lpszUrlPath, parts.dwUrlPathLength);
+        if (object_name.empty())
+            object_name = L"/";
+        if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
+            object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+
+        session.value = WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.09", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+            WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (!session)
+        {
+            error = WinHttpError(L"WinHttpOpen");
+            return false;
+        }
+
+        connect.value = WinHttpConnect(session, host.c_str(), parts.nPort, 0);
+        if (!connect)
+        {
+            error = WinHttpError(L"WinHttpConnect");
+            return false;
+        }
+
+        const DWORD flags = parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
+        WinHttpHandle request{ WinHttpOpenRequest(connect, L"GET", object_name.c_str(), nullptr,
+            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags) };
+        if (!request)
+        {
+            error = WinHttpError(L"WinHttpOpenRequest");
+            return false;
+        }
+        WinHttpSetTimeouts(request, 5000, 5000, 10000, 10000);
+        if (!WinHttpSetOption(request, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, nullptr, 0))
+        {
+            error = WinHttpError(L"WebSocket upgrade setup");
+            return false;
+        }
+
+        std::wstring headers;
+        if (!token.empty())
+            headers = L"Authorization: Bearer " + token + L"\r\n";
+        if (!WinHttpSendRequest(
+            request,
+            headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
+            headers.empty() ? 0 : static_cast<DWORD>(headers.size()),
+            WINHTTP_NO_REQUEST_DATA,
+            0,
+            0,
+            0) || !WinHttpReceiveResponse(request, nullptr))
+        {
+            error = WinHttpError(L"OneBot WebSocket handshake");
+            return false;
+        }
+
+        DWORD status = 0;
+        DWORD status_size = sizeof(status);
+        if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX, &status, &status_size, WINHTTP_NO_HEADER_INDEX) || status != 101)
+        {
+            error = L"OneBot WebSocket handshake returned HTTP " + std::to_wstring(status) + L".";
+            return false;
+        }
+
+        websocket.value = WinHttpWebSocketCompleteUpgrade(request, 0);
+        if (!websocket)
+        {
+            error = WinHttpError(L"WebSocket upgrade");
+            return false;
+        }
+        WinHttpCloseHandle(request.value);
+        request.value = nullptr;
+        DWORD close_timeout = 1000;
+        WinHttpSetOption(websocket, WINHTTP_OPTION_WEB_SOCKET_CLOSE_TIMEOUT, &close_timeout, sizeof(close_timeout));
+        return true;
+    }
 }
 
 SettingData::SettingData()
@@ -499,6 +684,7 @@ CDataManager::CDataManager()
 
 CDataManager::~CDataManager()
 {
+    StopOneBotCommandListener();
     SaveConfig();
 }
 
@@ -544,6 +730,7 @@ void CDataManager::LoadConfig(const std::wstring& config_dir)
         m_setting_data.enabled_metrics[index] = ini.GetBool(L"metrics", BuildMetricKey(definition).c_str(), true);
     }
     ResetOneBotNotification();
+    RestartOneBotCommandListener();
 }
 
 void CDataManager::SaveConfig() const
@@ -617,6 +804,7 @@ HICON CDataManager::GetIcon(UINT id)
 
 void CDataManager::Refresh()
 {
+    std::lock_guard<std::mutex> refresh_lock(m_refresh_mutex);
     RuntimeData data;
     data.username = m_setting_data.username;
 
@@ -664,6 +852,26 @@ void CDataManager::ResetOneBotNotification()
 {
     std::lock_guard<std::mutex> lock(m_runtime_mutex);
     m_last_notification_key.clear();
+}
+
+void CDataManager::RestartOneBotCommandListener()
+{
+    StopOneBotCommandListener();
+    SetOneBotCommandError(L"");
+    if (!m_setting_data.onebot_enabled
+        || m_setting_data.onebot_ws_url.empty()
+        || m_setting_data.onebot_private_target.empty())
+    {
+        return;
+    }
+
+    m_onebot_listener_stop.store(false);
+    m_onebot_listener_thread = std::thread(
+        &CDataManager::OneBotCommandListenerLoop,
+        this,
+        OneBotEventUrl(m_setting_data.onebot_ws_url),
+        m_setting_data.onebot_token,
+        m_setting_data.onebot_private_target);
 }
 
 RuntimeData CDataManager::GetRuntimeData() const
@@ -748,6 +956,9 @@ std::wstring CDataManager::BuildTooltip() const
         ss << L"\nError: " << data.last_error;
     if (!data.onebot_last_error.empty())
         ss << L"\nOneBot alert error: " << data.onebot_last_error;
+    const std::wstring command_error = GetOneBotCommandError();
+    if (!command_error.empty())
+        ss << L"\nOneBot command error: " << command_error;
     ss << L"\nStatus: " << FormatStatusCode(data.overall_status) << L" (" << data.overall_status << L")  OK " << data.status_operational << L"/" << data.status_total;
     if (data.status_blocked > 0)
         ss << L", blocked " << data.status_blocked;
@@ -1170,12 +1381,14 @@ bool CDataManager::ParseStatusDashboard(const std::string& json, RuntimeData& da
                 ++total;
                 CountStatusBucket(status, operational, degraded, error_count, failed, unknown);
                 overall = WorseStatus(overall, status);
+                const StatusChannelData channel{ status, channel_name, name, model };
+                data.status_channels.push_back(channel);
                 if (StatusSeverity(status) >= 3)
-                    data.status_issues.push_back({ status, channel_name, name, model });
+                    data.status_issues.push_back(channel);
             }
         }
 
-        std::sort(data.status_issues.begin(), data.status_issues.end(), [](const StatusIssueData& left, const StatusIssueData& right) {
+        const auto status_order = [](const StatusChannelData& left, const StatusChannelData& right) {
             const int left_severity = StatusSeverity(left.status);
             const int right_severity = StatusSeverity(right.status);
             if (left_severity != right_severity)
@@ -1185,7 +1398,9 @@ bool CDataManager::ParseStatusDashboard(const std::string& json, RuntimeData& da
             if (left.name != right.name)
                 return left.name < right.name;
             return left.model < right.model;
-        });
+        };
+        std::sort(data.status_channels.begin(), data.status_channels.end(), status_order);
+        std::sort(data.status_issues.begin(), data.status_issues.end(), status_order);
 
         data.overall_status = has_items ? overall : L"--";
         data.status_total = total;
@@ -1336,7 +1551,7 @@ void CDataManager::NotifyOneBotIfNeeded(RuntimeData& data)
     {
         for (size_t i = 0; i < data.status_issues.size(); ++i)
         {
-            const StatusIssueData& issue = data.status_issues[i];
+            const StatusChannelData& issue = data.status_issues[i];
             message << i + 1 << L". [" << FormatStatusCode(issue.status) << L"] ";
             if (!issue.channel_name.empty())
                 message << L"\u6e20\u9053\uff1a" << issue.channel_name;
@@ -1372,101 +1587,19 @@ bool CDataManager::SendOneBotPrivateMessage(const std::wstring& message, std::ws
         return false;
     }
 
-    std::wstring url = m_setting_data.onebot_ws_url;
-    if (StartsWithIgnoreCase(url, L"wss://"))
-        url.replace(0, 6, L"https://");
-    else if (StartsWithIgnoreCase(url, L"ws://"))
-        url.replace(0, 5, L"http://");
-    else
+    WinHttpHandle session;
+    WinHttpHandle connect;
+    WinHttpHandle websocket;
+    if (!OpenOneBotWebSocket(
+        m_setting_data.onebot_ws_url,
+        m_setting_data.onebot_token,
+        session,
+        connect,
+        websocket,
+        error))
     {
-        error = L"OneBot URL must start with ws:// or wss://.";
         return false;
     }
-
-    URL_COMPONENTS parts{};
-    parts.dwStructSize = sizeof(parts);
-    parts.dwSchemeLength = static_cast<DWORD>(-1);
-    parts.dwHostNameLength = static_cast<DWORD>(-1);
-    parts.dwUrlPathLength = static_cast<DWORD>(-1);
-    parts.dwExtraInfoLength = static_cast<DWORD>(-1);
-    if (!WinHttpCrackUrl(url.c_str(), static_cast<DWORD>(url.size()), 0, &parts))
-    {
-        error = L"Invalid OneBot WS URL.";
-        return false;
-    }
-
-    std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
-    std::wstring object_name;
-    if (parts.lpszUrlPath != nullptr && parts.dwUrlPathLength > 0)
-        object_name.assign(parts.lpszUrlPath, parts.dwUrlPathLength);
-    if (object_name.empty())
-        object_name = L"/";
-    if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
-        object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
-
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.08", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
-    if (!session)
-    {
-        error = WinHttpError(L"WinHttpOpen");
-        return false;
-    }
-
-    WinHttpHandle connect{ WinHttpConnect(session, host.c_str(), parts.nPort, 0) };
-    if (!connect)
-    {
-        error = WinHttpError(L"WinHttpConnect");
-        return false;
-    }
-
-    DWORD flags = parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
-    WinHttpHandle request{ WinHttpOpenRequest(connect, L"GET", object_name.c_str(), nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags) };
-    if (!request)
-    {
-        error = WinHttpError(L"WinHttpOpenRequest");
-        return false;
-    }
-    WinHttpSetTimeouts(request, 5000, 5000, 10000, 10000);
-    if (!WinHttpSetOption(request, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, nullptr, 0))
-    {
-        error = WinHttpError(L"WebSocket upgrade setup");
-        return false;
-    }
-
-    std::wstring headers;
-    if (!m_setting_data.onebot_token.empty())
-        headers = L"Authorization: Bearer " + m_setting_data.onebot_token + L"\r\n";
-    if (!WinHttpSendRequest(
-        request,
-        headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
-        headers.empty() ? 0 : static_cast<DWORD>(headers.size()),
-        WINHTTP_NO_REQUEST_DATA,
-        0,
-        0,
-        0) || !WinHttpReceiveResponse(request, nullptr))
-    {
-        error = WinHttpError(L"OneBot WebSocket handshake");
-        return false;
-    }
-
-    DWORD status = 0;
-    DWORD status_size = sizeof(status);
-    if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-        WINHTTP_HEADER_NAME_BY_INDEX, &status, &status_size, WINHTTP_NO_HEADER_INDEX) || status != 101)
-    {
-        error = L"OneBot WebSocket handshake returned HTTP " + std::to_wstring(status) + L".";
-        return false;
-    }
-
-    WinHttpHandle websocket{ WinHttpWebSocketCompleteUpgrade(request, 0) };
-    if (!websocket)
-    {
-        error = WinHttpError(L"WebSocket upgrade");
-        return false;
-    }
-    WinHttpCloseHandle(request.value);
-    request.value = nullptr;
-    DWORD close_timeout = 1000;
-    WinHttpSetOption(websocket, WINHTTP_OPTION_WEB_SOCKET_CLOSE_TIMEOUT, &close_timeout, sizeof(close_timeout));
 
     std::string body = "{\"action\":\"send_private_msg\",\"params\":{\"user_id\":\""
         + EscapeJsonString(m_setting_data.onebot_private_target)
@@ -1523,7 +1656,7 @@ bool CDataManager::SendOneBotPrivateMessage(const std::wstring& message, std::ws
             current_message.append(buffer, bytes_read);
             if (buffer_type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE)
             {
-                if (IsOneBotAlertResponse(current_message))
+                if (IsOneBotResponse(current_message, "amp-manager-alert"))
                 {
                     response = current_message;
                     break;
@@ -1579,6 +1712,196 @@ bool CDataManager::SendOneBotPrivateMessage(const std::wstring& message, std::ws
     }
     yyjson_doc_free(response_doc);
     return accepted;
+}
+
+void CDataManager::StopOneBotCommandListener()
+{
+    m_onebot_listener_stop.store(true);
+    {
+        std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+        if (m_onebot_listener_websocket != nullptr)
+        {
+            WinHttpWebSocketClose(
+                m_onebot_listener_websocket,
+                WINHTTP_WEB_SOCKET_SUCCESS_CLOSE_STATUS,
+                nullptr,
+                0);
+        }
+    }
+    m_onebot_listener_cv.notify_all();
+    if (m_onebot_listener_thread.joinable())
+        m_onebot_listener_thread.join();
+    std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+    m_onebot_listener_websocket = nullptr;
+}
+
+void CDataManager::OneBotCommandListenerLoop(
+    std::wstring event_url,
+    std::wstring token,
+    std::wstring private_target)
+{
+    while (!m_onebot_listener_stop.load())
+    {
+        WinHttpHandle session;
+        WinHttpHandle connect;
+        WinHttpHandle websocket;
+        std::wstring error;
+        if (!OpenOneBotWebSocket(event_url, token, session, connect, websocket, error))
+        {
+            SetOneBotCommandError(error);
+        }
+        else
+        {
+            {
+                std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+                if (m_onebot_listener_stop.load())
+                {
+                    WinHttpWebSocketClose(websocket, WINHTTP_WEB_SOCKET_SUCCESS_CLOSE_STATUS, nullptr, 0);
+                    break;
+                }
+                m_onebot_listener_websocket = websocket.value;
+                m_onebot_command_error.clear();
+            }
+
+            std::string current_message;
+            DWORD receive_result = NO_ERROR;
+            while (!m_onebot_listener_stop.load())
+            {
+                char buffer[4096];
+                DWORD bytes_read = 0;
+                WINHTTP_WEB_SOCKET_BUFFER_TYPE buffer_type{};
+                receive_result = WinHttpWebSocketReceive(
+                    websocket,
+                    buffer,
+                    static_cast<DWORD>(sizeof(buffer)),
+                    &bytes_read,
+                    &buffer_type);
+                if (receive_result != NO_ERROR)
+                    break;
+                if (buffer_type == WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE)
+                {
+                    receive_result = ERROR_CONNECTION_ABORTED;
+                    break;
+                }
+                if (buffer_type != WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE
+                    && buffer_type != WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE)
+                {
+                    receive_result = ERROR_INVALID_DATA;
+                    break;
+                }
+
+                current_message.append(buffer, bytes_read);
+                if (current_message.size() > 1024 * 1024)
+                {
+                    receive_result = ERROR_INVALID_DATA;
+                    break;
+                }
+                if (buffer_type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE)
+                {
+                    if (IsOneBotStatusCommand(current_message, private_target))
+                    {
+                        Refresh();
+                        std::wstring send_error;
+                        if (!SendOneBotPrivateMessage(BuildOneBotStatusMessage(), send_error))
+                            SetOneBotCommandError(send_error);
+                        else
+                            SetOneBotCommandError(L"");
+                    }
+                    current_message.clear();
+                }
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+                if (m_onebot_listener_websocket == websocket.value)
+                    m_onebot_listener_websocket = nullptr;
+            }
+            if (!m_onebot_listener_stop.load()
+                && receive_result != ERROR_WINHTTP_OPERATION_CANCELLED)
+            {
+                SetOneBotCommandError(
+                    L"OneBot event WebSocket disconnected (" + std::to_wstring(receive_result) + L").");
+            }
+            if (!m_onebot_listener_stop.load())
+                WinHttpWebSocketClose(websocket, WINHTTP_WEB_SOCKET_SUCCESS_CLOSE_STATUS, nullptr, 0);
+        }
+
+        if (!m_onebot_listener_stop.load())
+        {
+            std::unique_lock<std::mutex> lock(m_onebot_listener_mutex);
+            m_onebot_listener_cv.wait_for(lock, std::chrono::seconds(5), [this]() {
+                return m_onebot_listener_stop.load();
+            });
+        }
+    }
+}
+
+std::wstring CDataManager::BuildOneBotStatusMessage() const
+{
+    const RuntimeData data = GetRuntimeData();
+    std::wstringstream message;
+    message << L"\u3010AMP \u6e20\u9053\u72b6\u6001\u3011\n";
+    if (!data.has_status_dashboard)
+    {
+        message << L"\u6682\u65e0\u53ef\u7528\u7684\u6e20\u9053\u72b6\u6001\u3002";
+        if (!data.last_error.empty())
+            message << L"\n\u9519\u8bef\uff1a" << data.last_error;
+        if (!data.last_refresh_time.empty())
+            message << L"\n\u66f4\u65b0\u65f6\u95f4\uff1a" << data.last_refresh_time;
+        return message.str();
+    }
+
+    message << L"\u6574\u4f53\uff1a" << FormatStatusCode(data.overall_status) << L"\n"
+        << L"\u6b63\u5e38 " << data.status_operational << L"/" << data.status_total
+        << L"\uff0c\u964d\u7ea7 " << data.status_degraded
+        << L"\uff0c\u9519\u8bef " << data.status_error
+        << L"\uff0c\u81f4\u547d " << data.status_failed << L"\n"
+        << L"\u6e20\u9053\u660e\u7ec6\uff1a\n";
+    if (data.status_channels.empty())
+    {
+        if (data.status_blocked > 0)
+            message << L"- \u6ca1\u6709\u672a\u5c4f\u853d\u7684\u6e20\u9053\n";
+        else
+            message << L"- \u63a5\u53e3\u672a\u8fd4\u56de\u6e20\u9053\u660e\u7ec6\n";
+    }
+    else
+    {
+        for (size_t i = 0; i < data.status_channels.size(); ++i)
+        {
+            const StatusChannelData& channel = data.status_channels[i];
+            message << i + 1 << L". [" << FormatStatusCode(channel.status) << L"] ";
+            if (!channel.channel_name.empty())
+                message << channel.channel_name;
+            else if (!channel.name.empty())
+                message << channel.name;
+            else if (!channel.model.empty())
+                message << channel.model;
+            else
+                message << L"\u672a\u547d\u540d\u6e20\u9053";
+            if (!channel.name.empty() && channel.name != channel.channel_name)
+                message << L"\uff1b\u9879\u76ee\uff1a" << channel.name;
+            if (!channel.model.empty() && channel.model != channel.channel_name && channel.model != channel.name)
+                message << L"\uff1b\u6a21\u578b\uff1a" << channel.model;
+            message << L"\n";
+        }
+    }
+    if (data.status_blocked > 0)
+        message << L"\u5df2\u5c4f\u853d\u6e20\u9053\uff1a" << data.status_blocked << L"\n";
+    message << L"\u66f4\u65b0\u65f6\u95f4\uff1a"
+        << (data.last_refresh_time.empty() ? L"--" : data.last_refresh_time);
+    return message.str();
+}
+
+void CDataManager::SetOneBotCommandError(const std::wstring& error)
+{
+    std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+    m_onebot_command_error = error;
+}
+
+std::wstring CDataManager::GetOneBotCommandError() const
+{
+    std::lock_guard<std::mutex> lock(m_onebot_listener_mutex);
+    return m_onebot_command_error;
 }
 
 std::wstring CDataManager::ProtectPassword(const std::wstring& plain) const

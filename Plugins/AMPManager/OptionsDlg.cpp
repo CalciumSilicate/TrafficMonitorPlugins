@@ -101,7 +101,7 @@ void COptionsDlg::OnOK()
     m_data.onebot_private_target = GetDlgText(this, IDC_ONEBOT_PRIVATE_TARGET_EDIT);
     if (m_data.onebot_enabled && (m_data.onebot_ws_url.empty() || m_data.onebot_private_target.empty()))
     {
-        MessageBox(L"OneBot WS URL and private target are required when alerts are enabled.", L"AMP Manager", MB_OK | MB_ICONWARNING);
+        MessageBox(L"OneBot WS URL and private target are required when OneBot is enabled.", L"AMP Manager", MB_OK | MB_ICONWARNING);
         return;
     }
     if (m_data.onebot_enabled

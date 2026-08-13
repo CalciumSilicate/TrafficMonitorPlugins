@@ -49,6 +49,7 @@ ITMPlugin::OptionReturn CAMPManager::ShowOptionsDialog(void* hParent)
         g_data.SaveConfig();
         g_data.ClearToken();
         g_data.ResetOneBotNotification();
+        g_data.RestartOneBotCommandListener();
         RebuildItems();
         StartRefreshThread(true);
         return ITMPlugin::OR_OPTION_CHANGED;
@@ -71,7 +72,7 @@ const wchar_t* CAMPManager::GetInfo(PluginInfoIndex index)
     case ITMPlugin::TMI_URL:
         return L"https://github.com/CalciumSilicate/TrafficMonitorPlugins";
     case TMI_VERSION:
-        return L"1.08";
+        return L"1.09";
     default:
         break;
     }
