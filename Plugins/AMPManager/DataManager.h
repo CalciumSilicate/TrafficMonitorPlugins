@@ -58,6 +58,14 @@ struct SettingData
     SettingData();
 };
 
+struct StatusIssueData
+{
+    std::wstring status;
+    std::wstring channel_name;
+    std::wstring name;
+    std::wstring model;
+};
+
 struct RuntimeData
 {
     bool login_ok{};
@@ -79,6 +87,7 @@ struct RuntimeData
     int status_error{};
     int status_failed{};
     int status_blocked{};
+    std::vector<StatusIssueData> status_issues;
 
     long long today_requests{};
     std::wstring today_cost_usd{ L"--" };
@@ -169,7 +178,7 @@ private:
     RuntimeData m_runtime_data;
     std::wstring m_token;
     time_t m_last_refresh_time{};
-    std::wstring m_last_notified_status;
+    std::wstring m_last_notification_key;
 
     std::vector<MetricDefinition> m_metric_definitions;
 };

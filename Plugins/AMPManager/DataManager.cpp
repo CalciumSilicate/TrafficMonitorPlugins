@@ -663,7 +663,7 @@ void CDataManager::ClearToken()
 void CDataManager::ResetOneBotNotification()
 {
     std::lock_guard<std::mutex> lock(m_runtime_mutex);
-    m_last_notified_status.clear();
+    m_last_notification_key.clear();
 }
 
 RuntimeData CDataManager::GetRuntimeData() const
@@ -1170,8 +1170,22 @@ bool CDataManager::ParseStatusDashboard(const std::string& json, RuntimeData& da
                 ++total;
                 CountStatusBucket(status, operational, degraded, error_count, failed, unknown);
                 overall = WorseStatus(overall, status);
+                if (StatusSeverity(status) >= 3)
+                    data.status_issues.push_back({ status, channel_name, name, model });
             }
         }
+
+        std::sort(data.status_issues.begin(), data.status_issues.end(), [](const StatusIssueData& left, const StatusIssueData& right) {
+            const int left_severity = StatusSeverity(left.status);
+            const int right_severity = StatusSeverity(right.status);
+            if (left_severity != right_severity)
+                return left_severity > right_severity;
+            if (left.channel_name != right.channel_name)
+                return left.channel_name < right.channel_name;
+            if (left.name != right.name)
+                return left.name < right.name;
+            return left.model < right.model;
+        });
 
         data.overall_status = has_items ? overall : L"--";
         data.status_total = total;
@@ -1293,9 +1307,16 @@ void CDataManager::NotifyOneBotIfNeeded(RuntimeData& data)
         ResetOneBotNotification();
         return;
     }
+
+    std::wstring notification_key = status_code;
+    for (const auto& issue : data.status_issues)
+    {
+        notification_key += L"\n" + FormatStatusCode(issue.status) + L"\t"
+            + issue.channel_name + L"\t" + issue.name + L"\t" + issue.model;
+    }
     {
         std::lock_guard<std::mutex> lock(m_runtime_mutex);
-        if (status_code == m_last_notified_status)
+        if (notification_key == m_last_notification_key)
             return;
     }
 
@@ -1306,14 +1327,38 @@ void CDataManager::NotifyOneBotIfNeeded(RuntimeData& data)
         << L"\uff0c\u964d\u7ea7 " << data.status_degraded
         << L"\uff0c\u9519\u8bef " << data.status_error
         << L"\uff0c\u81f4\u547d " << data.status_failed << L"\n"
-        << L"\u68c0\u6d4b\u65f6\u95f4\uff1a" << data.last_refresh_time << L"\n"
+        << L"\u5f02\u5e38\u6e20\u9053\uff1a\n";
+    if (data.status_issues.empty())
+    {
+        message << L"- \u63a5\u53e3\u672a\u8fd4\u56de\u6e20\u9053\u660e\u7ec6\n";
+    }
+    else
+    {
+        for (size_t i = 0; i < data.status_issues.size(); ++i)
+        {
+            const StatusIssueData& issue = data.status_issues[i];
+            message << i + 1 << L". [" << FormatStatusCode(issue.status) << L"] ";
+            if (!issue.channel_name.empty())
+                message << L"\u6e20\u9053\uff1a" << issue.channel_name;
+            else if (!issue.name.empty())
+                message << L"\u6e20\u9053\uff1a" << issue.name;
+            else
+                message << L"\u672a\u547d\u540d\u6e20\u9053";
+            if (!issue.name.empty() && issue.name != issue.channel_name)
+                message << L"\uff1b\u9879\u76ee\uff1a" << issue.name;
+            if (!issue.model.empty() && issue.model != issue.channel_name && issue.model != issue.name)
+                message << L"\uff1b\u6a21\u578b\uff1a" << issue.model;
+            message << L"\n";
+        }
+    }
+    message << L"\u68c0\u6d4b\u65f6\u95f4\uff1a" << data.last_refresh_time << L"\n"
         << L"\u8bf7\u53ca\u65f6\u68c0\u67e5 AMP \u670d\u52a1\u72b6\u6001\u3002";
 
     std::wstring error;
     if (SendOneBotPrivateMessage(message.str(), error))
     {
         std::lock_guard<std::mutex> lock(m_runtime_mutex);
-        m_last_notified_status = status_code;
+        m_last_notification_key = notification_key;
     }
     else
         data.onebot_last_error = error;
@@ -1359,7 +1404,7 @@ bool CDataManager::SendOneBotPrivateMessage(const std::wstring& message, std::ws
     if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
         object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.07", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
+    WinHttpHandle session{ WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.08", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0) };
     if (!session)
     {
         error = WinHttpError(L"WinHttpOpen");

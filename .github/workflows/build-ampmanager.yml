@@ -93,7 +93,7 @@ jobs:
       - name: Package AMPManager download zips
         shell: pwsh
         run: |
-          $version = "1.07"
+          $version = "1.08"
           New-Item -ItemType Directory -Force -Path download/AMPManager | Out-Null
           $x64Dll = Get-ChildItem artifacts/AMPManager-x64 -Recurse -Filter AMPManager.dll | Select-Object -First 1
           $x86Dll = Get-ChildItem artifacts/AMPManager-x86 -Recurse -Filter AMPManager.dll | Select-Object -First 1
@@ -109,10 +109,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add download/AMPManager/AMPManager_V1.07_x64.zip download/AMPManager/AMPManager_V1.07_x86.zip
+          git add download/AMPManager/AMPManager_V1.08_x64.zip download/AMPManager/AMPManager_V1.08_x86.zip
           if ((git status --porcelain).Length -eq 0) {
             Write-Host "No AMPManager download zip changes to commit."
             exit 0
           }
-          git commit -m "chore: 添加 AMP Manager 1.07 插件下载包"
+          git commit -m "chore: 添加 AMP Manager 1.08 插件下载包"
           git push origin HEAD:${{ github.ref_name }}
