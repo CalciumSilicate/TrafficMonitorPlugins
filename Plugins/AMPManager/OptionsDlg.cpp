@@ -56,6 +56,10 @@ BOOL COptionsDlg::OnInitDialog()
     SetDlgText(this, IDC_PASSWORD_EDIT, m_data.password);
     SetDlgItemInt(IDC_REFRESH_INTERVAL_EDIT, m_data.refresh_interval_sec);
     SetDlgText(this, IDC_BLOCK_WORDS_EDIT, m_data.block_words);
+    SetCheck(this, IDC_ONEBOT_ENABLED_CHECK, m_data.onebot_enabled);
+    SetDlgText(this, IDC_ONEBOT_WS_URL_EDIT, m_data.onebot_ws_url);
+    SetDlgText(this, IDC_ONEBOT_TOKEN_EDIT, m_data.onebot_token);
+    SetDlgText(this, IDC_ONEBOT_PRIVATE_TARGET_EDIT, m_data.onebot_private_target);
 
     SetCheck(this, IDC_METRIC_STATUS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::Status)]);
     SetCheck(this, IDC_METRIC_TODAY_REQUESTS_CHECK, m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::TodayRequests)]);
@@ -90,6 +94,23 @@ void COptionsDlg::OnOK()
     m_data.block_words = GetDlgText(this, IDC_BLOCK_WORDS_EDIT);
     if (m_data.refresh_interval_sec < 10)
         m_data.refresh_interval_sec = 10;
+
+    m_data.onebot_enabled = GetCheck(this, IDC_ONEBOT_ENABLED_CHECK);
+    m_data.onebot_ws_url = GetDlgText(this, IDC_ONEBOT_WS_URL_EDIT);
+    m_data.onebot_token = GetDlgText(this, IDC_ONEBOT_TOKEN_EDIT);
+    m_data.onebot_private_target = GetDlgText(this, IDC_ONEBOT_PRIVATE_TARGET_EDIT);
+    if (m_data.onebot_enabled && (m_data.onebot_ws_url.empty() || m_data.onebot_private_target.empty()))
+    {
+        MessageBox(L"OneBot WS URL and private target are required when alerts are enabled.", L"AMP Manager", MB_OK | MB_ICONWARNING);
+        return;
+    }
+    if (m_data.onebot_enabled
+        && _wcsnicmp(m_data.onebot_ws_url.c_str(), L"ws://", 5) != 0
+        && _wcsnicmp(m_data.onebot_ws_url.c_str(), L"wss://", 6) != 0)
+    {
+        MessageBox(L"OneBot WS URL must start with ws:// or wss://.", L"AMP Manager", MB_OK | MB_ICONWARNING);
+        return;
+    }
 
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::Status)] = GetCheck(this, IDC_METRIC_STATUS_CHECK);
     m_data.enabled_metrics[static_cast<size_t>(AmpMetricId::TodayRequests)] = GetCheck(this, IDC_METRIC_TODAY_REQUESTS_CHECK);

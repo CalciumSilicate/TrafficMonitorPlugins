@@ -49,6 +49,10 @@ struct SettingData
     std::wstring password;
     int refresh_interval_sec{ 30 };
     std::wstring block_words;
+    bool onebot_enabled{};
+    std::wstring onebot_ws_url{ L"ws://127.0.0.1:3001/api" };
+    std::wstring onebot_token;
+    std::wstring onebot_private_target;
     std::array<bool, static_cast<size_t>(AmpMetricId::Count)> enabled_metrics{};
 
     SettingData();
@@ -66,6 +70,7 @@ struct RuntimeData
     std::wstring username;
     std::wstring last_error;
     std::wstring last_refresh_time;
+    std::wstring onebot_last_error;
 
     std::wstring overall_status{ L"--" };
     int status_total{};
@@ -124,6 +129,7 @@ public:
 
     void Refresh();
     void ClearToken();
+    void ResetOneBotNotification();
     RuntimeData GetRuntimeData() const;
     std::wstring GetMetricValue(AmpMetricId id) const;
     std::wstring BuildTooltip() const;
@@ -146,6 +152,8 @@ private:
     bool ParseAdminDashboard(const std::string& json, RuntimeData& data, std::wstring& error) const;
     bool ParseAdminTrends(const std::string& json, RuntimeData& data, std::wstring& error) const;
     bool ParsePurchaseStats(const std::string& json, RuntimeData& data, std::wstring& error) const;
+    void NotifyOneBotIfNeeded(RuntimeData& data);
+    bool SendOneBotPrivateMessage(const std::wstring& message, std::wstring& error) const;
     std::wstring ProtectPassword(const std::wstring& plain) const;
     std::wstring UnprotectPassword(const std::wstring& encoded) const;
     void SetRuntimeData(const RuntimeData& data);
@@ -161,6 +169,7 @@ private:
     RuntimeData m_runtime_data;
     std::wstring m_token;
     time_t m_last_refresh_time{};
+    std::wstring m_last_notified_status;
 
     std::vector<MetricDefinition> m_metric_definitions;
 };
