@@ -579,7 +579,7 @@ namespace
         if (parts.lpszExtraInfo != nullptr && parts.dwExtraInfoLength > 0)
             object_name.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-        session.value = WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.09", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+        session.value = WinHttpOpen(L"AMPManager TrafficMonitor Plugin/1.10", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
             WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session)
         {
@@ -1535,8 +1535,11 @@ void CDataManager::NotifyOneBotIfNeeded(RuntimeData& data)
             return;
     }
 
+    const wchar_t* severity_prefix = status_code == L"DW" ? L"\u26a0\ufe0f DW "
+        : status_code == L"ERR" ? L"\u274c ERR "
+        : L"\U0001f6a8 FATAL ";
     std::wstringstream message;
-    message << L"\u3010AMP Manager \u544a\u8b66\u3011\n"
+    message << severity_prefix << L"\u3010AMP Manager \u544a\u8b66\u3011\n"
         << L"AMP \u72b6\u6001\u5f02\u5e38\uff1a" << status_code << L"\n"
         << L"\u6b63\u5e38 " << data.status_operational << L"/" << data.status_total
         << L"\uff0c\u964d\u7ea7 " << data.status_degraded

@@ -72,7 +72,7 @@ const wchar_t* CAMPManager::GetInfo(PluginInfoIndex index)
     case ITMPlugin::TMI_URL:
         return L"https://github.com/CalciumSilicate/TrafficMonitorPlugins";
     case TMI_VERSION:
-        return L"1.09";
+        return L"1.10";
     default:
         break;
     }
