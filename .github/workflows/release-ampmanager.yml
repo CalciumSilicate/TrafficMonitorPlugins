@@ -1,0 +1,45 @@
+name: Release AMPManager
+
+on:
+  push:
+    tags:
+      - "AMPManager-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish packaged AMPManager release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#AMPManager-v}"
+          x64="download/AMPManager/AMPManager_V${version}_x64.zip"
+          x86="download/AMPManager/AMPManager_V${version}_x86.zip"
+          test -f "$x64"
+          test -f "$x86"
+          unzip -t "$x64"
+          unzip -t "$x86"
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          支持在插件设置的 **API proxy** 中设置 HTTP / SOCKS5 代理。
+
+          - HTTP：`http://127.0.0.1:7890`
+          - SOCKS5：`socks5://127.0.0.1:1080`
+          - SOCKS5（代理解析 DNS）：`socks5h://127.0.0.1:1080`
+          - 支持 `协议://用户名:密码@主机:端口`；URL 特殊字符需百分号编码。
+          - 代理地址加密保存；留空沿用原有连接。
+          - 仅代理 AMP API 登录和数据查询，OneBot 连接保持原有行为。
+          - 自定义代理依赖 Windows 系统自带的 `curl.exe`。
+
+          根据 TrafficMonitor 的位数下载 x64 或 x86 压缩包，将 DLL 解压到其 `plugins` 目录并重启。
+          NOTES
+          gh release create "$GITHUB_REF_NAME" "$x64" "$x86" \
+            --verify-tag --title "AMP Manager v${version}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
