@@ -54,6 +54,7 @@ BOOL COptionsDlg::OnInitDialog()
     SetDlgText(this, IDC_BASE_URL_EDIT, m_data.base_url);
     SetDlgText(this, IDC_USERNAME_EDIT, m_data.username);
     SetDlgText(this, IDC_PASSWORD_EDIT, m_data.password);
+    SetDlgText(this, IDC_PROXY_URL_EDIT, m_data.proxy_url);
     SetDlgItemInt(IDC_REFRESH_INTERVAL_EDIT, m_data.refresh_interval_sec);
     SetDlgText(this, IDC_BLOCK_WORDS_EDIT, m_data.block_words);
     SetCheck(this, IDC_ONEBOT_ENABLED_CHECK, m_data.onebot_enabled);
@@ -87,6 +88,17 @@ void COptionsDlg::OnOK()
     m_data.base_url = GetDlgText(this, IDC_BASE_URL_EDIT);
     m_data.username = GetDlgText(this, IDC_USERNAME_EDIT);
     m_data.password = GetDlgText(this, IDC_PASSWORD_EDIT);
+    CString proxy(GetDlgText(this, IDC_PROXY_URL_EDIT).c_str());
+    proxy.Trim();
+    m_data.proxy_url = proxy.GetString();
+    if (!m_data.proxy_url.empty()
+        && _wcsnicmp(proxy, L"http://", 7) != 0
+        && _wcsnicmp(proxy, L"socks5://", 9) != 0
+        && _wcsnicmp(proxy, L"socks5h://", 10) != 0)
+    {
+        MessageBox(L"Proxy must start with http://, socks5:// or socks5h://. Leave blank for the default connection.", L"AMP Manager", MB_OK | MB_ICONWARNING);
+        return;
+    }
 
     BOOL translated = FALSE;
     UINT interval = GetDlgItemInt(IDC_REFRESH_INTERVAL_EDIT, &translated, FALSE);

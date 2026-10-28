@@ -69,6 +69,172 @@ namespace
         return utilities::StringHelper::StrToUnicode(value, true);
     }
 
+    struct NativeHandle
+    {
+        HANDLE value{};
+        ~NativeHandle() { if (value && value != INVALID_HANDLE_VALUE) CloseHandle(value); }
+        void Close() { if (value) CloseHandle(value); value = nullptr; }
+    };
+
+    // Pass secrets through stdin, never the process command line or a temporary file.
+    std::string CurlQuoted(const std::string& value)
+    {
+        std::string result = "\"";
+        for (char ch : value)
+        {
+            switch (ch)
+            {
+            case '\\': result += "\\\\"; break;
+            case '"': result += "\\\""; break;
+            case '\r': result += "\\r"; break;
+            case '\n': result += "\\n"; break;
+            case '\t': result += "\\t"; break;
+            default: result += ch; break;
+            }
+        }
+        return result + "\"";
+    }
+
+    bool RequestViaProxy(const std::wstring& proxy, const std::wstring& url,
+        const wchar_t* method, const std::string& body, const std::wstring& token,
+        std::string& result, int& status_code, std::wstring& error)
+    {
+        if (!StartsWithIgnoreCase(proxy, L"http://")
+            && !StartsWithIgnoreCase(proxy, L"socks5://")
+            && !StartsWithIgnoreCase(proxy, L"socks5h://"))
+        {
+            error = L"Unsupported proxy URL. Use http://, socks5:// or socks5h://.";
+            return false;
+        }
+        std::string config = "silent\nconnect-timeout = 5\nmax-time = 20\n"
+            "proto = \"=http,https\"\nnoproxy = \"\"\nwrite-out = \"\\n%{http_code}\"\n";
+        config += "proxy = " + CurlQuoted(ToUtf8(proxy)) + "\n";
+        config += "url = " + CurlQuoted(ToUtf8(url)) + "\n";
+        config += "request = " + CurlQuoted(ToUtf8(method)) + "\n";
+        config += "header = \"Accept: application/json\"\n";
+        if (!token.empty())
+            config += "header = " + CurlQuoted("Authorization: Bearer " + ToUtf8(token)) + "\n";
+        if (_wcsicmp(method, L"POST") == 0)
+        {
+            config += "header = \"Content-Type: application/json\"\n";
+            config += "data-binary = " + CurlQuoted(body) + "\n";
+        }
+        if (config.size() > 60000)
+        {
+            error = L"Proxy request configuration is too large.";
+            return false;
+        }
+
+        SECURITY_ATTRIBUTES security{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+        NativeHandle input_read, input_write, output_read, output_write, null_output;
+        if (!CreatePipe(&input_read.value, &input_write.value, &security, 65536)
+            || !CreatePipe(&output_read.value, &output_write.value, &security, 0)
+            || !SetHandleInformation(input_write.value, HANDLE_FLAG_INHERIT, 0)
+            || !SetHandleInformation(output_read.value, HANDLE_FLAG_INHERIT, 0))
+        {
+            error = L"Unable to create proxy request pipes.";
+            return false;
+        }
+        null_output.value = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            &security, OPEN_EXISTING, 0, nullptr);
+        if (null_output.value == INVALID_HANDLE_VALUE)
+        {
+            error = L"Unable to initialize proxy request output.";
+            return false;
+        }
+        wchar_t system_dir[MAX_PATH]{};
+        if (!GetSystemDirectoryW(system_dir, _countof(system_dir)))
+        {
+            error = L"Unable to locate Windows curl.exe.";
+            return false;
+        }
+        std::wstring executable = std::wstring(system_dir) + L"\\curl.exe";
+#ifndef _WIN64
+        // A 32-bit TrafficMonitor on 64-bit Windows must use the native system curl.
+        BOOL wow64 = FALSE;
+        if (IsWow64Process(GetCurrentProcess(), &wow64) && wow64)
+        {
+            wchar_t windows_dir[MAX_PATH]{};
+            if (GetWindowsDirectoryW(windows_dir, _countof(windows_dir)))
+                executable = std::wstring(windows_dir) + L"\\Sysnative\\curl.exe";
+        }
+#endif
+        std::wstring command = L"\"" + executable + L"\" --disable --config -";
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        startup.dwFlags = STARTF_USESTDHANDLES;
+        startup.hStdInput = input_read.value;
+        startup.hStdOutput = output_write.value;
+        startup.hStdError = null_output.value;
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(executable.c_str(), &command[0], nullptr, nullptr, TRUE,
+            CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+        {
+            error = L"Proxy requests require Windows curl.exe (Windows 10 1803 or newer).";
+            return false;
+        }
+        NativeHandle process_handle{ process.hProcess }, thread_handle{ process.hThread };
+        input_read.Close();
+        output_write.Close();
+        DWORD written = 0;
+        bool ok = WriteFile(input_write.value, config.data(), static_cast<DWORD>(config.size()), &written, nullptr)
+            && written == config.size();
+        input_write.Close();
+        const ULONGLONG started = GetTickCount64();
+        std::string output;
+        while (ok)
+        {
+            DWORD available = 0;
+            if (!PeekNamedPipe(output_read.value, nullptr, 0, nullptr, &available, nullptr))
+                break;
+            if (available)
+            {
+                char buffer[8192];
+                DWORD received = 0;
+                if (!ReadFile(output_read.value, buffer, (std::min)(available, static_cast<DWORD>(sizeof(buffer))), &received, nullptr))
+                { ok = false; break; }
+                output.append(buffer, received);
+                if (output.size() > 16 * 1024 * 1024)
+                { ok = false; break; }
+            }
+            else if (WaitForSingleObject(process.hProcess, 0) == WAIT_OBJECT_0)
+                break;
+            else
+                Sleep(10);
+            if (GetTickCount64() - started > 25000)
+            { ok = false; break; }
+        }
+        if (!ok || WaitForSingleObject(process.hProcess, 1000) != WAIT_OBJECT_0)
+        {
+            TerminateProcess(process.hProcess, 1);
+            WaitForSingleObject(process.hProcess, 1000);
+            error = L"Proxy request failed, timed out, or exceeded the response limit.";
+            return false;
+        }
+        DWORD exit_code = 0;
+        GetExitCodeProcess(process.hProcess, &exit_code);
+        if (exit_code != 0)
+        {
+            error = L"Proxy request failed (curl code " + std::to_wstring(exit_code) + L").";
+            return false;
+        }
+        const size_t separator = output.rfind('\n');
+        if (separator == std::string::npos || output.size() - separator != 4
+            || output.find_first_not_of("0123456789", separator + 1) != std::string::npos)
+        {
+            error = L"Invalid proxy HTTP response.";
+            return false;
+        }
+        status_code = atoi(output.c_str() + separator + 1);
+        result = output.substr(0, separator);
+        if (status_code < 200 || status_code >= 300)
+        {
+            error = L"HTTP " + std::to_wstring(status_code);
+            return false;
+        }
+        return true;
+    }
+
     std::string EscapeJsonString(const std::wstring& value)
     {
         std::string text = ToUtf8(value);
@@ -715,6 +881,7 @@ void CDataManager::LoadConfig(const std::wstring& config_dir)
     m_setting_data.base_url = ini.GetString(L"config", L"base_url", m_setting_data.base_url.c_str());
     m_setting_data.username = ini.GetString(L"config", L"username", L"");
     m_setting_data.password = UnprotectPassword(ini.GetString(L"config", L"password", L""));
+    m_setting_data.proxy_url = UnprotectPassword(ini.GetString(L"config", L"proxy_url", L""));
     m_setting_data.refresh_interval_sec = ini.GetInt(L"config", L"refresh_interval_sec", 30);
     m_setting_data.block_words = ini.GetString(L"config", L"block_words", L"");
     m_setting_data.onebot_enabled = ini.GetBool(L"onebot", L"enabled", false);
@@ -742,6 +909,7 @@ void CDataManager::SaveConfig() const
     ini.WriteString(L"config", L"base_url", TrimTrailingSlash(m_setting_data.base_url));
     ini.WriteString(L"config", L"username", m_setting_data.username);
     ini.WriteString(L"config", L"password", ProtectPassword(m_setting_data.password));
+    ini.WriteString(L"config", L"proxy_url", ProtectPassword(m_setting_data.proxy_url));
     int refresh_interval = m_setting_data.refresh_interval_sec < 10 ? 10 : m_setting_data.refresh_interval_sec;
     ini.WriteInt(L"config", L"refresh_interval_sec", refresh_interval);
     ini.WriteString(L"config", L"block_words", m_setting_data.block_words);
@@ -1049,6 +1217,16 @@ bool CDataManager::RequestJson(const wchar_t* method, const std::wstring& path, 
     status_code = 0;
 
     std::wstring url = TrimTrailingSlash(m_setting_data.base_url) + path;
+    if (!m_setting_data.proxy_url.empty())
+    {
+        std::wstring token;
+        if (with_auth)
+        {
+            std::lock_guard<std::mutex> lock(m_runtime_mutex);
+            token = m_token;
+        }
+        return RequestViaProxy(m_setting_data.proxy_url, url, method, body, token, result, status_code, error);
+    }
     URL_COMPONENTS parts{};
     parts.dwStructSize = sizeof(parts);
     wchar_t host[256]{};

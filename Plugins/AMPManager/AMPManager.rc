@@ -29,7 +29,7 @@ BEGIN
 END
 #endif
 
-IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 430
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 474
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "AMP Manager Settings"
 FONT 9, "Microsoft YaHei UI", 400, 0, 0x0
@@ -71,13 +71,16 @@ BEGIN
     CONTROL         "Purchase CNY total",IDC_METRIC_PURCHASE_TOTAL_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,342,118,10
     CONTROL         "Throughput RPM",IDC_METRIC_LATEST_RPM_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,358,100,10
     CONTROL         "Latest TTFB",IDC_METRIC_LATEST_TTFB_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,374,90,10
-    DEFPUSHBUTTON   "OK",IDOK,166,408,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,222,408,50,14
+    LTEXT           "API proxy:",IDC_STATIC,8,402,54,8
+    EDITTEXT        IDC_PROXY_URL_EDIT,70,400,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "http://host:port or socks5[h]://host:port; blank = default. API only; requires Windows curl.exe.",IDC_STATIC,70,418,202,26
+    DEFPUSHBUTTON   "OK",IDOK,166,452,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,452,50,14
 END
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,10,0
- PRODUCTVERSION 1,0,10,0
+ FILEVERSION 1,0,11,0
+ PRODUCTVERSION 1,0,11,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -94,12 +97,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "CalciumSilicate"
             VALUE "FileDescription", "AMPManager Plugin for TrafficMonitor"
-            VALUE "FileVersion", "1.0.10.0"
+            VALUE "FileVersion", "1.0.11.0"
             VALUE "InternalName", "AMPManager.dll"
             VALUE "LegalCopyright", "Copyright (C) 2026 CalciumSilicate"
             VALUE "OriginalFilename", "AMPManager.dll"
             VALUE "ProductName", "AMPManager Plugin for TrafficMonitor"
-            VALUE "ProductVersion", "1.0.10.0"
+            VALUE "ProductVersion", "1.0.11.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -121,7 +124,7 @@ END
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
 
-IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 430
+IDD_OPTIONS_DIALOG DIALOGEX 0, 0, 280, 474
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "AMP Manager Settings"
 FONT 9, "Segoe UI", 400, 0, 0x0
@@ -163,8 +166,11 @@ BEGIN
     CONTROL         "Purchase CNY total",IDC_METRIC_PURCHASE_TOTAL_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,342,118,10
     CONTROL         "Throughput RPM",IDC_METRIC_LATEST_RPM_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,358,100,10
     CONTROL         "Latest TTFB",IDC_METRIC_LATEST_TTFB_CHECK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,148,374,90,10
-    DEFPUSHBUTTON   "OK",IDOK,166,408,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,222,408,50,14
+    LTEXT           "API proxy:",IDC_STATIC,8,402,54,8
+    EDITTEXT        IDC_PROXY_URL_EDIT,70,400,202,14,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "http://host:port or socks5[h]://host:port; blank = default. API only; requires Windows curl.exe.",IDC_STATIC,70,418,202,26
+    DEFPUSHBUTTON   "OK",IDOK,166,452,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,222,452,50,14
 END
 
 STRINGTABLE

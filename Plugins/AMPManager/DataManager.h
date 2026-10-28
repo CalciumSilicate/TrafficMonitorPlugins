@@ -50,6 +50,7 @@ struct SettingData
     std::wstring base_url{ L"https://api.asxs.top" };
     std::wstring username;
     std::wstring password;
+    std::wstring proxy_url;
     int refresh_interval_sec{ 30 };
     std::wstring block_words;
     bool onebot_enabled{};
